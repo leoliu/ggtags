@@ -353,10 +353,9 @@ If nil, use Emacs default."
   (if ggtags-navigation-mode
       (progn
         (add-hook 'next-error-hook 'ggtags-move-to-tag)
-        (add-hook 'minibuffer-setup-hook
-                  'ggtags-minibuffer-setup-function nil t))
+        (add-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function))
     (remove-hook 'next-error-hook 'ggtags-move-to-tag)
-    (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function t)))
+    (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function)))
 
 (defun ggtags-minibuffer-setup-function ()
   ;; Disable ggtags-navigation-mode in minibuffer.
