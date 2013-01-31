@@ -1,6 +1,6 @@
 ;;; ggtags.el --- GNU Global source code tagging system -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013  Leo Liu
+;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
 ;; Version: 0.5
@@ -217,9 +217,10 @@ If nil, use Emacs default."
 
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (let ((count (save-excursion
-                 (goto-char (point-min))
-                 (and (re-search-forward "^\\([0-9]+\\) objects? located" nil t)
-                      (string-to-number (match-string 1))))))
+                 (goto-char (point-max))
+                 (if (re-search-backward "^\\([0-9]+\\) objects? located" nil t)
+                     (string-to-number (match-string 1))
+                   0))))
     (cons (if (> exit-status 0)
               msg
             (format "found %d %s" count (if (= count 1) "match" "matches")))
