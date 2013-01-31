@@ -78,10 +78,10 @@ If nil, use Emacs default."
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
   `(progn
-     (assert (and (buffer-live-p compilation-last-buffer)
-                  (with-current-buffer compilation-last-buffer
-                    (derived-mode-p 'ggtags-global-mode)))
-             nil "No global buffer found")
+     (or (and (buffer-live-p compilation-last-buffer)
+              (with-current-buffer compilation-last-buffer
+                (derived-mode-p 'ggtags-global-mode)))
+         (error "No global buffer found"))
      (with-current-buffer compilation-last-buffer ,@body)))
 
 (defun ggtags-cache-timestamp (root)
@@ -124,13 +124,13 @@ If nil, use Emacs default."
          (comment-string-strip (buffer-string) t t))))))
 
 (defun ggtags-check-root-directory ()
-  (assert (ggtags-root-directory) nil "File GTAGS not found"))
+  (or (ggtags-root-directory) (error "File GTAGS not found")))
 
 (defun ggtags-ensure-root-directory ()
   (or (ggtags-root-directory)
       (if (yes-or-no-p "File GTAGS not found; run gtags? ")
           (let ((root (read-directory-name "Directory: " nil nil t)))
-            (assert (not (zerop (length root))) nil "No directory chosen")
+            (and (= (length root) 0) (error "No directory chosen"))
             (ggtags-ignore-file-error
               (with-temp-buffer
                 (if (zerop (let ((default-directory
