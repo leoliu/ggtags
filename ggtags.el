@@ -247,9 +247,12 @@ If nil, use Emacs default."
   (goto-char start)
   (when ggtags-global-abbreviate-filename
     (while (re-search-forward "^\\([^:\n]+\\):[0-9]+:" end t)
-      (when (or (not (numberp ggtags-global-abbreviate-filename))
-                (> (length (match-string 1))
-                   ggtags-global-abbreviate-filename))
+      (when (and (or (not (numberp ggtags-global-abbreviate-filename))
+                     (> (length (match-string 1))
+                        ggtags-global-abbreviate-filename))
+                 ;; Ignore bogus file lines such as:
+                 ;;     Global found 2 matches at Thu Jan 31 13:45:19
+                 (get-text-property (match-beginning 0) 'compilation-message))
         (ggtags-abbreviate-file (match-beginning 1) (match-end 1))))))
 
 (defun ggtags-handle-single-match (buf _how)
