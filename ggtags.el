@@ -161,22 +161,23 @@ Return -1 if it does not exist."
           tags)
       (cadr (ggtags-cache-get root)))))
 
-(defun ggtags-read-tag (&optional reference)
+(defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
   (let* ((tags (ggtags-tag-names))
          (sym (thing-at-point 'symbol))
          (default (and (member sym tags) sym)))
     (setq ggtags-current-tag-name
-          (completing-read
-           (format (if default
-                       "%s for tag (default %s): "
-                     "%s for tag: ")
-                   (if reference "Reference" "Definition") default)
-           tags nil t nil nil default))))
+          (if quick (or default (error "No valid tag at point"))
+            (completing-read
+             (format (if default "Tag (default %s): " "Tag: ") default)
+             tags nil t nil nil default)))))
 
 ;;;###autoload
-(defun ggtags-find-tag (name &optional reference)
-  (interactive (list (ggtags-read-tag current-prefix-arg)
+(defun ggtags-find-tag (name &optional verbose)
+  "Find definitions or references to tag NAME by context.
+If point is at a definition tag, find references, and vice versa.
+When called with prefix, ask the name and kind of tag."
+  (interactive (list (ggtags-read-tag (not current-prefix-arg))
                      current-prefix-arg))
   (ggtags-check-root-directory)
   (ggtags-navigation-mode +1)
@@ -184,9 +185,17 @@ Return -1 if it does not exist."
   (let ((split-window-preferred-function
          (lambda (w) (split-window (frame-root-window w))))
         (default-directory (ggtags-root-directory)))
-    (compilation-start (format "global -v%s --result=grep \"%s\""
-                               (if reference "r" "") name)
-                       'ggtags-global-mode)))
+    (compilation-start
+     (if verbose
+         (format "global -v%s --result=grep \"%s\""
+                 (if (y-or-n-p "Kind (y for definition n for reference)? ")
+                     "" "r")
+                 name)
+       (format "global -v --result=grep --from-here=%d:%s \"%s\""
+               (line-number-at-pos)
+               (expand-file-name buffer-file-name)
+               name))
+     'ggtags-global-mode)))
 
 (defun ggtags-find-tag-resume ()
   (interactive)
