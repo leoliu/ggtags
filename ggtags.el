@@ -155,7 +155,7 @@ Return -1 if it does not exist."
                       (split-string
                        (with-output-to-string
                          (call-process "global" nil (list standard-output nil)
-                                       nil "-c" (or prefix "")))))))
+                                       nil "-cT" (or prefix "")))))))
           (when tags
             (ggtags-cache-set root tags))
           tags)
