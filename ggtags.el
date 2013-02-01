@@ -194,28 +194,6 @@ Return -1 if it does not exist."
     (ggtags-navigation-mode +1)
     (compile-goto-error)))
 
-(defvar ggtags-tag-overlay nil)
-(make-variable-buffer-local 'ggtags-tag-overlay)
-
-(defun ggtags-highlight-tag-at-point ()
-  (unless (overlayp ggtags-tag-overlay)
-    (setq ggtags-tag-overlay (make-overlay (point) (point)))
-    (overlay-put ggtags-tag-overlay 'ggtags t))
-  (let ((bounds (bounds-of-thing-at-point 'symbol)))
-    (cond
-     ((not bounds)
-      (overlay-put ggtags-tag-overlay 'face nil)
-      (move-overlay ggtags-tag-overlay (point) (point)))
-     ((notany (lambda (o)
-                (overlay-get o 'ggtags))
-              (overlays-at (car bounds)))
-      (move-overlay ggtags-tag-overlay (car bounds) (cdr bounds))
-      (overlay-put ggtags-tag-overlay 'face
-                   (when (member (buffer-substring (car bounds) (cdr bounds))
-                                 (ggtags-tag-names))
-                     'ggtags-highlight))
-      (overlay-put ggtags-tag-overlay 'window t)))))
-
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (let ((count (save-excursion
                  (goto-char (point-max))
@@ -383,6 +361,41 @@ Return -1 if it does not exist."
   (let ((root (ggtags-root-directory)))
     (and root (ggtags-cache-mark-dirty root t))))
 
+(defvar ggtags-tag-overlay nil)
+(defvar ggtags-highlight-tag-timer nil)
+(make-variable-buffer-local 'ggtags-tag-overlay)
+
+(defun ggtags-highlight-tag-at-point (buffer)
+  (when (eq buffer (current-buffer))
+    (unless (overlayp ggtags-tag-overlay)
+      (setq ggtags-tag-overlay (make-overlay (point) (point)))
+      (overlay-put ggtags-tag-overlay 'ggtags t))
+    (let* ((bounds (bounds-of-thing-at-point 'symbol))
+           (valid-tag (when bounds
+                        (member (buffer-substring (car bounds) (cdr bounds))
+                                (ggtags-tag-names))))
+           (o ggtags-tag-overlay)
+           (done-p (lambda ()
+                     (and (memq o (overlays-at (car bounds)))
+                          (= (overlay-start o) (car bounds))
+                          (= (overlay-end o) (cdr bounds))
+                          (or (and valid-tag (overlay-get o 'face))
+                              (and (not valid-tag) (not (overlay-get o 'face))))))))
+      (cond
+       ((not bounds)
+        (overlay-put ggtags-tag-overlay 'face nil)
+        (move-overlay ggtags-tag-overlay (point) (point)))
+       ((not (funcall done-p))
+        (move-overlay o (car bounds) (cdr bounds))
+        (overlay-put o 'face (and valid-tag 'ggtags-highlight)))))))
+
+(defun ggtags-post-command-function ()
+  (when (timerp ggtags-highlight-tag-timer)
+    (cancel-timer ggtags-highlight-tag-timer))
+  (setq ggtags-highlight-tag-timer
+        (run-with-idle-timer 0.2 nil 'ggtags-highlight-tag-at-point
+                             (current-buffer))))
+
 (defvar ggtags-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\M-." 'ggtags-find-tag)
@@ -398,9 +411,9 @@ Return -1 if it does not exist."
         (or (ggtags-root-directory)
             (message "File GTAGS not found"))
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
-        (add-hook 'post-command-hook 'ggtags-highlight-tag-at-point nil t))
+        (add-hook 'post-command-hook 'ggtags-post-command-function nil t))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
-    (remove-hook 'post-command-hook 'ggtags-highlight-tag-at-point t)
+    (remove-hook 'post-command-hook 'ggtags-post-command-function t)
     (and (overlayp ggtags-tag-overlay)
          (delete-overlay ggtags-tag-overlay))
     (setq ggtags-tag-overlay nil)))
