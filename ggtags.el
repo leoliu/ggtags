@@ -395,9 +395,8 @@ Return -1 if it does not exist."
   :lighter (:eval (if ggtags-navigation-mode "" " GG"))
   (if ggtags-mode
       (progn
-        (unless (ggtags-root-directory)
-          (funcall (if (fboundp 'user-error) 'user-error 'message)
-                   "File GTAGS not found"))
+        (or (ggtags-root-directory)
+            (message "File GTAGS not found"))
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
         (add-hook 'post-command-hook 'ggtags-highlight-tag-at-point nil t))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
