@@ -84,8 +84,9 @@ If nil, use Emacs default."
          (error "No global buffer found"))
      (with-current-buffer compilation-last-buffer ,@body)))
 
-(defun ggtags-cache-timestamp (root)
-  "Get the timestamp of file GTAGS in ROOT directory."
+(defun ggtags-get-timestamp (root)
+  "Get the timestamp (float) of file GTAGS in ROOT directory.
+Return -1 if it does not exist."
   (let ((file (expand-file-name "GTAGS" root)))
     (if (file-exists-p file)
         (float-time (nth 5 (file-attributes file)))
@@ -112,7 +113,7 @@ If nil, use Emacs default."
 
 (defun ggtags-cache-stale-p (key)
   "Value is non-nil if tags in cache needs to be rebuilt."
-  (> (ggtags-cache-timestamp key)
+  (> (ggtags-get-timestamp key)
      (or (fourth (ggtags-cache-get key)) 0)))
 
 ;;;###autoload
