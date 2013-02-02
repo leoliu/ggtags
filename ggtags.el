@@ -201,7 +201,9 @@ When called with prefix, ask the name and kind of tag."
   (interactive)
   (ggtags-ensure-global-buffer
     (ggtags-navigation-mode +1)
-    (compile-goto-error)))
+    (let ((split-window-preferred-function
+           (lambda (w) (split-window (frame-root-window w)))))
+      (compile-goto-error))))
 
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (let ((count (save-excursion
