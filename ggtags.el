@@ -408,7 +408,7 @@ When called with prefix, ask the name and kind of tag."
 (defvar ggtags-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\M-." 'ggtags-find-tag)
-    (define-key map "\C-c\M-n" 'ggtags-find-tag-resume)
+    (define-key map "\M-," 'ggtags-find-tag-resume)
     (define-key map "\C-c\M-k" 'ggtags-kill-file-buffers)
     map))
 
