@@ -354,13 +354,18 @@ When called with prefix, ask the name and kind of tag."
   "Kill all buffers visiting files in the root directory."
   (interactive "p")
   (ggtags-check-root-directory)
-  (let ((root (ggtags-root-directory))
-        (count 0))
+  (let ((gtagslibpath (split-string (or (getenv "GTAGSLIBPATH") "") ":" t))
+        (root (ggtags-root-directory))
+        (count 0)
+        (some (lambda (pred list)
+                (loop for x in list when (funcall pred x) return it))))
     (dolist (buf (buffer-list))
       (let ((file (and (buffer-live-p buf)
                        (not (eq buf (current-buffer)))
                        (buffer-file-name buf))))
-        (when (and file (file-in-directory-p (file-truename file) root))
+        (when (and file (funcall some (apply-partially #'file-in-directory-p
+                                                       (file-truename file))
+                                 (cons root gtagslibpath)))
           (and (kill-buffer buf)
                (incf count)))))
     (and interactive
