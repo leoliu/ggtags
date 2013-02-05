@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.5
+;; Version: 0.6
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -68,6 +68,10 @@ If nil, use Emacs default."
 (defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY TIMESTAMP)
 
 (defvar ggtags-current-tag-name nil)
+
+;; Used by ggtags-global-mode
+(defvar ggtags-global-error "match"
+  "Stem of message to print when no matches are found.")
 
 (defmacro ggtags-ignore-file-error (&rest body)
   (declare (indent 0))
@@ -449,10 +453,6 @@ When called with prefix, ask the name and kind of tag."
     (goto-char (point-min))
     (forward-line (1- line))
     (ggtags-move-to-tag name)))
-
-;; NOTE: `ggtags-build-imenu-index' is signficantly faster and more
-;; precise than the similar feature provided by cc mode. Tested with
-;; ClassFileWriter.java of the rhino project.
 
 ;;;###autoload
 (defun ggtags-build-imenu-index ()
