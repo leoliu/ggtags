@@ -92,6 +92,9 @@ Return -1 if it does not exist."
         (float-time (nth 5 (file-attributes file)))
       -1)))
 
+(defun ggtags-get-libpath ()
+  (split-string (or (getenv "GTAGSLIBPATH") "") ":" t))
+
 (defun ggtags-cache-get (key)
   (assoc key ggtags-cache))
 
@@ -142,6 +145,19 @@ Return -1 if it does not exist."
                   (error "%s" (comment-string-strip (buffer-string) t t))))))
         (error "Aborted"))))
 
+(defun ggtags-tag-names-1 (root &optional prefix)
+  (when root
+    (if (ggtags-cache-stale-p root)
+        (let* ((default-directory (file-name-as-directory root))
+               (tags (with-demoted-errors
+                       (split-string
+                        (with-output-to-string
+                          (call-process "global" nil (list standard-output nil)
+                                        nil "-c" (or prefix "")))))))
+          (and tags (ggtags-cache-set root tags))
+          tags)
+      (cadr (ggtags-cache-get root)))))
+
 ;;;###autoload
 (defun ggtags-tag-names (&optional prefix)
   "Get a list of tag names starting with PREFIX."
@@ -150,16 +166,9 @@ Return -1 if it does not exist."
       (if (zerop (call-process "global" nil nil nil "-u"))
           (ggtags-cache-mark-dirty root nil)
         (message "ggtags: error running 'global -u'")))
-    (if (ggtags-cache-stale-p root)
-        (let ((tags (ggtags-ignore-file-error
-                      (split-string
-                       (with-output-to-string
-                         (call-process "global" nil (list standard-output nil)
-                                       nil "-cT" (or prefix "")))))))
-          (when tags
-            (ggtags-cache-set root tags))
-          tags)
-      (cadr (ggtags-cache-get root)))))
+    (apply 'append (mapcar (lambda (r)
+                             (ggtags-tag-names-1 r prefix))
+                           (cons root (ggtags-get-libpath))))))
 
 (defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
@@ -356,8 +365,7 @@ When called with prefix, ask the name and kind of tag."
   "Kill all buffers visiting files in the root directory."
   (interactive "p")
   (ggtags-check-root-directory)
-  (let ((gtagslibpath (split-string (or (getenv "GTAGSLIBPATH") "") ":" t))
-        (root (ggtags-root-directory))
+  (let ((root (ggtags-root-directory))
         (count 0)
         (some (lambda (pred list)
                 (loop for x in list when (funcall pred x) return it))))
@@ -367,7 +375,7 @@ When called with prefix, ask the name and kind of tag."
                        (buffer-file-name buf))))
         (when (and file (funcall some (apply-partially #'file-in-directory-p
                                                        (file-truename file))
-                                 (cons root gtagslibpath)))
+                                 (cons root (ggtags-get-libpath))))
           (and (kill-buffer buf)
                (incf count)))))
     (and interactive
