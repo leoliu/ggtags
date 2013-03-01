@@ -79,6 +79,14 @@ If nil, use Emacs default."
        (progn ,@body)
      (file-error nil)))
 
+;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
+(defvar ggtags-global-has-path-style    ; introduced in global 6.2.8
+  (ggtags-ignore-file-error
+    (and (string-match-p "^--path-style "
+                         (shell-command-to-string "global --help"))
+         t))
+  "Non-nil if `global' supports --path-style switch.")
+
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
   `(progn
@@ -185,6 +193,11 @@ Return -1 if it does not exist."
              (format (if default "Tag (default %s): " "Tag: ") default)
              tags nil t nil nil default)))))
 
+(defvar ggtags-global-options
+  (concat "-v --result=grep"
+          (and ggtags-global-has-path-style " --path-style=shorter"))
+  "Options (as a string) for running `global'.")
+
 ;;;###autoload
 (defun ggtags-find-tag (name &optional verbose)
   "Find definitions or references to tag NAME by context.
@@ -200,11 +213,13 @@ When called with prefix, ask the name and kind of tag."
         (default-directory (ggtags-root-directory)))
     (compilation-start
      (if verbose
-         (format "global -v%s --result=grep \"%s\""
+         (format "global %s %s \"%s\""
+                 ggtags-global-options
                  (if (y-or-n-p "Kind (y for definition n for reference)? ")
-                     "" "r")
+                     "" "-r")
                  name)
-       (format "global -v --result=grep --from-here=%d:%s \"%s\""
+       (format "global %s --from-here=%d:%s \"%s\""
+               ggtags-global-options
                (line-number-at-pos)
                (expand-file-name buffer-file-name)
                name))
