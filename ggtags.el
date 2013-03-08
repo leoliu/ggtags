@@ -105,7 +105,8 @@ Return -1 if it does not exist."
       -1)))
 
 (defun ggtags-get-libpath ()
-  (split-string (or (getenv "GTAGSLIBPATH") "") ":" t))
+  (split-string (or (getenv "GTAGSLIBPATH") "")
+                (regexp-quote path-separator) t))
 
 (defun ggtags-cache-get (key)
   (assoc key ggtags-cache))
