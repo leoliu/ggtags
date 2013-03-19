@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.6
+;; Version: 0.6.1
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -287,6 +287,7 @@ When called with prefix, ask the name and kind of tag."
                    (point) 'compilation-message))))
     (ggtags-navigation-mode -1)
     ;; 0.5s delay for `ggtags-auto-jump-to-first-match'
+    (sit-for 0)                    ; See: http://debbugs.gnu.org/13829
     (ggtags-navigation-mode-cleanup buf 0.5)))
 
 (define-compilation-mode ggtags-global-mode "Global"
@@ -338,8 +339,7 @@ When called with prefix, ask the name and kind of tag."
            (when (and (derived-mode-p 'ggtags-global-mode)
                       (get-buffer-window))
              (delete-window (get-buffer-window)))
-           (and time (run-with-idle-timer time nil
-                                          'kill-buffer (current-buffer)))))))
+           (and time (run-with-idle-timer time nil 'kill-buffer buf))))))
 
 (defun ggtags-navigation-mode-done ()
   (interactive)
