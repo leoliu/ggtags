@@ -38,7 +38,13 @@
 (eval-when-compile
   (unless (fboundp 'setq-local)
     (defmacro setq-local (var val)
-      (list 'set (list 'make-local-variable (list 'quote var)) val))))
+      (list 'set (list 'make-local-variable (list 'quote var)) val)))
+
+  (unless (fboundp 'defvar-local)
+    (defmacro defvar-local (var val &optional docstring)
+      (declare (debug defvar) (doc-string 3))
+      (list 'progn (list 'defvar var val docstring)
+            (list 'make-variable-buffer-local (list 'quote var))))))
 
 (defgroup ggtags nil
   "GNU Global source code tagging system."
@@ -132,13 +138,19 @@ Return -1 if it does not exist."
   (> (ggtags-get-timestamp key)
      (or (fourth (ggtags-cache-get key)) 0)))
 
+(defvar-local ggtags-root-directory 'init
+  "Internal; use function `ggtags-root-directory' instead.")
+
 ;;;###autoload
 (defun ggtags-root-directory ()
-  (ggtags-ignore-file-error
-    (with-temp-buffer
-      (when (zerop (call-process "global" nil (list t nil) nil "-pr"))
-        (file-name-as-directory
-         (comment-string-strip (buffer-string) t t))))))
+  (if (string-or-null-p ggtags-root-directory)
+      ggtags-root-directory
+    (setq ggtags-root-directory
+          (ggtags-ignore-file-error
+           (with-temp-buffer
+             (when (zerop (call-process "global" nil (list t nil) nil "-pr"))
+               (file-name-as-directory
+                (comment-string-strip (buffer-string) t t))))))))
 
 (defun ggtags-check-root-directory ()
   (or (ggtags-root-directory) (error "File GTAGS not found")))
