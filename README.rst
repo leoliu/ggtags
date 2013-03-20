@@ -3,8 +3,7 @@
 =========================
  
 A package for working with `GNU Global
-<http://www.gnu.org/software/global>`_ source tagging system inside
-Emacs.
+<http://www.gnu.org/software/global>`_ source tagging system in Emacs.
 
 This package is part of `GNU ELPA <http://elpa.gnu.org>`_
 (``M-x list-packages``).
@@ -19,6 +18,15 @@ Features
 #. Built on top of ``compile.el`` (asynchonrous and other nice
    features)
 #. Abbreviated display of file names
+
+Why GNU Global
+~~~~~~~~~~~~~~
+
+The opengrok project composed a feature comparison table between a few
+tools. The `page
+<http://hub.opensolaris.org/bin/view/Project+opengrok>`_ is taken
+offline after 2013-03-24 but `here <http://i.imgur.com/IQCPQ0j.png>`_
+is a backup.
 
 Screenshot
 ~~~~~~~~~~
