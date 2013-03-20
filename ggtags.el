@@ -463,6 +463,7 @@ When called with prefix, ask the name and kind of tag."
     (setq ggtags-tag-overlay nil)))
 
 ;;; imenu
+
 (defun ggtags-goto-imenu-index (name line &rest _args)
   (save-restriction
     (widen)
@@ -484,6 +485,31 @@ When called with prefix, ask the name and kind of tag."
                   collect (list (match-string 1)
                                 (string-to-number (match-string 2))
                                 'ggtags-goto-imenu-index))))))))
+
+;;; hippie-expand
+
+;;;###autoload
+(defun try-complete-ggtags-tag (old)
+  "A function suitable for `hippie-expand-try-functions-list'."
+  (with-no-warnings                     ; to avoid loading hippie-exp
+    (unless old
+      (he-init-string (if (looking-back "\\_<.*" (line-beginning-position))
+                          (match-beginning 0)
+                        (point))
+                      (point))
+      (setq he-expand-list
+            (and (not (equal he-search-string ""))
+                 (ggtags-root-directory)
+                 (sort (all-completions he-search-string
+                                        (ggtags-tag-names))
+                       'string-lessp))))
+    (if (null he-expand-list)
+        (progn
+          (if old (he-reset-string))
+          nil)
+      (he-substitute-string (car he-expand-list))
+      (setq he-expand-list (cdr he-expand-list))
+      t)))
 
 (provide 'ggtags)
 ;;; ggtags.el ends here
