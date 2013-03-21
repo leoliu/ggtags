@@ -132,7 +132,7 @@ Return -1 if it does not exist."
   (> (ggtags-get-timestamp key)
      (or (fourth (ggtags-cache-get key)) 0)))
 
-(defvar-local ggtags-root-directory 'init
+(defvar-local ggtags-root-directory 'unset
   "Internal; use function `ggtags-root-directory' instead.")
 
 ;;;###autoload
@@ -406,7 +406,7 @@ When called with prefix, ask the name and kind of tag."
          (message "%d %s killed" count (if (= count 1) "buffer" "buffers")))))
 
 (defun ggtags-after-save-function ()
-  (let ((root (ggtags-root-directory)))
+  (let ((root (with-demoted-errors (ggtags-root-directory))))
     (and root (ggtags-cache-mark-dirty root t))))
 
 (defvar ggtags-tag-overlay nil)
@@ -456,10 +456,10 @@ When called with prefix, ask the name and kind of tag."
   :lighter (:eval (if ggtags-navigation-mode "" " GG"))
   (if ggtags-mode
       (progn
-        (or (ggtags-root-directory)
-            (message "File GTAGS not found"))
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
-        (add-hook 'post-command-hook 'ggtags-post-command-function nil t))
+        (if (executable-find "global")
+            (add-hook 'post-command-hook 'ggtags-post-command-function nil t)
+          (message "Failed to find GNU Global")))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
     (remove-hook 'post-command-hook 'ggtags-post-command-function t)
     (and (overlayp ggtags-tag-overlay)
@@ -481,8 +481,8 @@ When called with prefix, ask the name and kind of tag."
   (when buffer-file-name
     (let ((file (file-truename buffer-file-name)))
       (with-temp-buffer
-        (when (zerop (with-demoted-errors
-                       (call-process "global" nil t nil "-f" file)))
+        (when (with-demoted-errors
+                (zerop (call-process "global" nil t nil "-f" file)))
           (goto-char (point-min))
           (loop while (re-search-forward
                        "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
@@ -503,7 +503,7 @@ When called with prefix, ask the name and kind of tag."
                       (point))
       (setq he-expand-list
             (and (not (equal he-search-string ""))
-                 (ggtags-root-directory)
+                 (with-demoted-errors (ggtags-root-directory))
                  (sort (all-completions he-search-string
                                         (ggtags-tag-names))
                        'string-lessp))))
