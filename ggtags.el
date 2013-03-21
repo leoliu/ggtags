@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.6.1
+;; Version: 0.6.2
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -79,15 +79,9 @@ If nil, use Emacs default."
 (defvar ggtags-global-error "match"
   "Stem of message to print when no matches are found.")
 
-(defmacro ggtags-ignore-file-error (&rest body)
-  (declare (indent 0))
-  `(condition-case nil
-       (progn ,@body)
-     (file-error nil)))
-
 ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
 (defvar ggtags-global-has-path-style    ; introduced in global 6.2.8
-  (ggtags-ignore-file-error
+  (with-demoted-errors                  ; in case `global' not found
     (and (string-match-p "^--path-style "
                          (shell-command-to-string "global --help"))
          t))
@@ -146,11 +140,10 @@ Return -1 if it does not exist."
   (if (string-or-null-p ggtags-root-directory)
       ggtags-root-directory
     (setq ggtags-root-directory
-          (ggtags-ignore-file-error
-           (with-temp-buffer
-             (when (zerop (call-process "global" nil (list t nil) nil "-pr"))
-               (file-name-as-directory
-                (comment-string-strip (buffer-string) t t))))))))
+          (with-temp-buffer
+            (when (zerop (call-process "global" nil (list t nil) nil "-pr"))
+              (file-name-as-directory
+               (comment-string-strip (buffer-string) t t)))))))
 
 (defun ggtags-check-root-directory ()
   (or (ggtags-root-directory) (error "File GTAGS not found")))
@@ -160,14 +153,13 @@ Return -1 if it does not exist."
       (if (yes-or-no-p "File GTAGS not found; run gtags? ")
           (let ((root (read-directory-name "Directory: " nil nil t)))
             (and (= (length root) 0) (error "No directory chosen"))
-            (ggtags-ignore-file-error
-              (with-temp-buffer
-                (if (zerop (let ((default-directory
-                                   (file-name-as-directory root)))
-                             (call-process "gtags" nil t)))
-                    (message "File GTAGS generated in `%s'"
-                             (ggtags-root-directory))
-                  (error "%s" (comment-string-strip (buffer-string) t t))))))
+            (with-temp-buffer
+              (if (zerop (let ((default-directory
+                                 (file-name-as-directory root)))
+                           (call-process "gtags" nil t)))
+                  (message "File GTAGS generated in `%s'"
+                           (ggtags-root-directory))
+                (error "%s" (comment-string-strip (buffer-string) t t)))))
         (error "Aborted"))))
 
 (defun ggtags-tag-names-1 (root &optional prefix)
@@ -488,15 +480,15 @@ When called with prefix, ask the name and kind of tag."
   "A function suitable for `imenu-create-index-function'."
   (when buffer-file-name
     (let ((file (file-truename buffer-file-name)))
-      (ggtags-ignore-file-error
-        (with-temp-buffer
-          (when (zerop (call-process "global" nil t nil "-f" file))
-            (goto-char (point-min))
-            (loop while (re-search-forward
-                         "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
-                  collect (list (match-string 1)
-                                (string-to-number (match-string 2))
-                                'ggtags-goto-imenu-index))))))))
+      (with-temp-buffer
+        (when (zerop (with-demoted-errors
+                       (call-process "global" nil t nil "-f" file)))
+          (goto-char (point-min))
+          (loop while (re-search-forward
+                       "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
+                collect (list (match-string 1)
+                              (string-to-number (match-string 2))
+                              'ggtags-goto-imenu-index)))))))
 
 ;;; hippie-expand
 
