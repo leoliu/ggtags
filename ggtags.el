@@ -515,5 +515,14 @@ When called with prefix, ask the name and kind of tag."
       (setq he-expand-list (cdr he-expand-list))
       t)))
 
+;;; Finish up
+
+;; Higher priority for `ggtags-navigation-mode' to avoid being
+;; hijacked by modes such as `view-mode'.
+(defvar ggtags-mode-map-alist
+  `((ggtags-navigation-mode . ,ggtags-navigation-mode-map)))
+
+(add-to-list 'emulation-mode-map-alists 'ggtags-mode-map-alist)
+
 (provide 'ggtags)
 ;;; ggtags.el ends here
