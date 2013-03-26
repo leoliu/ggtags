@@ -223,11 +223,15 @@ When called with prefix, ask the name and kind of tag."
                  (if (y-or-n-p "Kind (y for definition n for reference)? ")
                      "" "-r")
                  name)
-       (format "global %s --from-here=%d:%s \"%s\""
-               ggtags-global-options
-               (line-number-at-pos)
-               (expand-file-name buffer-file-name)
-               name))
+       (if buffer-file-name
+           (format "global %s --from-here=%d:%s \"%s\""
+                   ggtags-global-options
+                   (line-number-at-pos)
+                   (expand-file-name buffer-file-name)
+                   name)
+         (format "global %s \"%s\""
+                 ggtags-global-options
+                 name)))
      'ggtags-global-mode)))
 
 (defun ggtags-find-tag-resume ()
