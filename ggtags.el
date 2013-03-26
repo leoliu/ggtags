@@ -217,10 +217,10 @@ When called with prefix, ask the name and kind of tag."
          (lambda (w) (split-window (frame-root-window w))))
         (default-directory (ggtags-root-directory)))
     (compilation-start
-     (if verbose
+     (if (or verbose (not buffer-file-name))
          (format "global %s %s \"%s\""
                  ggtags-global-options
-                 (if (y-or-n-p "Kind (y for definition n for reference)? ")
+                 (if (y-or-n-p "Find definition (n for reference)? ")
                      "" "-r")
                  name)
        (format "global %s --from-here=%d:%s \"%s\""
