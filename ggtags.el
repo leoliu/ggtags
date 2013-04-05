@@ -93,6 +93,11 @@ If nil, use Emacs default."
                  integer)
   :group 'ggtags)
 
+(defcustom ggtags-split-window-function split-window-preferred-function
+  "A function to control how ggtags pops up the auxiliary window."
+  :type 'function
+  :group 'ggtags)
+
 (defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY TIMESTAMP)
 
 (defvar ggtags-current-tag-name nil)
@@ -235,8 +240,7 @@ When called with prefix, ask the name and kind of tag."
   (ggtags-check-root-directory)
   (ggtags-navigation-mode +1)
   (ring-insert find-tag-marker-ring (point-marker))
-  (let ((split-window-preferred-function
-         (lambda (w) (split-window (frame-root-window w))))
+  (let ((split-window-preferred-function ggtags-split-window-function)
         (default-directory (ggtags-root-directory)))
     (compilation-start
      (if (or verbose (not buffer-file-name))
@@ -256,8 +260,7 @@ When called with prefix, ask the name and kind of tag."
   (interactive)
   (ggtags-ensure-global-buffer
     (ggtags-navigation-mode +1)
-    (let ((split-window-preferred-function
-           (lambda (w) (split-window (frame-root-window w)))))
+    (let ((split-window-preferred-function ggtags-split-window-function))
       (compile-goto-error))))
 
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
