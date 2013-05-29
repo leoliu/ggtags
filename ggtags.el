@@ -367,7 +367,7 @@ When called with prefix, ask the name and kind of tag."
              (kill-compilation))
            (when (and (derived-mode-p 'ggtags-global-mode)
                       (get-buffer-window))
-             (delete-window (get-buffer-window)))
+             (quit-window nil (get-buffer-window)))
            (and time (run-with-idle-timer time nil 'kill-buffer buf))))))
 
 (defun ggtags-navigation-mode-done ()
