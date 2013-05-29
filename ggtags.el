@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.6.3
+;; Version: 0.6.4
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -252,7 +252,7 @@ When called with prefix, ask the name and kind of tag."
        (format "global %s --from-here=%d:%s \"%s\""
                ggtags-global-options
                (line-number-at-pos)
-               (expand-file-name buffer-file-name)
+               (expand-file-name (file-truename buffer-file-name))
                name))
      'ggtags-global-mode)))
 
