@@ -97,6 +97,15 @@ If nil, use Emacs default."
   :type 'function
   :group 'ggtags)
 
+(defcustom ggtags-global-output-format 'grep
+  "The output format for the 'global' command."
+  :type '(choice (const path)
+                 (const ctags)
+                 (const ctags-x)
+                 (const grep)
+                 (const cscope))
+  :group 'ggtags)
+
 (defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY TIMESTAMP)
 
 (defvar ggtags-current-tag-name nil)
@@ -224,10 +233,10 @@ Return -1 if it does not exist."
              (format (if default "Tag (default %s): " "Tag: ") default)
              tags nil t nil nil default)))))
 
-(defvar ggtags-global-options
-  (concat "-v --result=grep"
-          (and ggtags-global-has-path-style " --path-style=shorter"))
-  "Options (as a string) for running `global'.")
+(defun ggtags-global-options ()
+  (concat "-v --result="
+          (symbol-name ggtags-global-output-format)
+          (and ggtags-global-has-path-style " --path-style=shorter")))
 
 ;;;###autoload
 (defun ggtags-find-tag (name &optional verbose)
@@ -245,12 +254,12 @@ When called with prefix, ask the name and kind of tag."
     (compilation-start
      (if (or verbose (not buffer-file-name))
          (format "global %s %s \"%s\""
-                 ggtags-global-options
+                 (ggtags-global-options)
                  (if (y-or-n-p "Find definition (n for reference)? ")
                      "" "-r")
                  name)
        (format "global %s --from-here=%d:%s \"%s\""
-               ggtags-global-options
+               (ggtags-global-options)
                (line-number-at-pos)
                (expand-file-name (file-truename buffer-file-name))
                name))
@@ -266,7 +275,7 @@ When called with prefix, ask the name and kind of tag."
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (let ((count (save-excursion
                  (goto-char (point-max))
-                 (if (re-search-backward "^\\([0-9]+\\) objects? located" nil t)
+                 (if (re-search-backward "^\\([0-9]+\\) \\w+ located" nil t)
                      (string-to-number (match-string 1))
                    0))))
     (cons (if (> exit-status 0)
@@ -294,15 +303,18 @@ When called with prefix, ask the name and kind of tag."
 
 (defun ggtags-abbreviate-files (start end)
   (goto-char start)
-  (when ggtags-global-abbreviate-filename
-    (while (re-search-forward "^\\([^:\n]+\\):[0-9]+:" end t)
-      (when (and (or (not (numberp ggtags-global-abbreviate-filename))
-                     (> (length (match-string 1))
-                        ggtags-global-abbreviate-filename))
-                 ;; Ignore bogus file lines such as:
-                 ;;     Global found 2 matches at Thu Jan 31 13:45:19
-                 (get-text-property (match-beginning 0) 'compilation-message))
-        (ggtags-abbreviate-file (match-beginning 1) (match-end 1))))))
+  (when (and ggtags-global-abbreviate-filename
+             (ggtags-global-output-format-error-regexp))
+    (let* ((error-re (ggtags-global-output-format-error-regexp))
+           (sub (cadr error-re)))
+      (while (re-search-forward (car error-re) end t)
+        (when (and (or (not (numberp ggtags-global-abbreviate-filename))
+                       (> (length (match-string sub))
+                          ggtags-global-abbreviate-filename))
+                   ;; Ignore bogus file lines such as:
+                   ;;     Global found 2 matches at Thu Jan 31 13:45:19
+                   (get-text-property (match-beginning sub) 'compilation-message))
+          (ggtags-abbreviate-file (match-beginning sub) (match-end sub)))))))
 
 (defun ggtags-handle-single-match (buf _how)
   (unless (or (not ggtags-auto-jump-to-first-match)
@@ -319,8 +331,43 @@ When called with prefix, ask the name and kind of tag."
     (sit-for 0)                    ; See: http://debbugs.gnu.org/13829
     (ggtags-navigation-mode-cleanup buf 0.5)))
 
+(defvar ggtags-global-mode-font-lock-keywords
+  '(("^-[*]-.*-[*]-$"
+     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
+    ("^\\w+ not found.*\\|^[0-9]+ \\w+ located.*"
+     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
+    ("^[Gg]lobal \\(?:started\\)?.*"
+     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
+    ("^Global found \\([0-9]+\\).*"
+     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t)
+     (1 compilation-info-face nil t))
+    ("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
+     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t)
+     (1 compilation-error-face)
+     (2 compilation-error-face nil t))))
+
+(defun ggtags-global-output-format-error-regexp ()
+  "Error regexp according to `ggtags-global-output-format'."
+  (pcase ggtags-global-output-format
+    (`path '("^[^ \t\n]+$" 0))
+    ;; ACTIVE_ESCAPE	src/dialog.cc	172
+    (`ctags '("^\\([^ \t\n]+\\)[ \t]+\\(.*?\\)[ \t]+\\([0-9]+\\)"
+              2 3 nil nil 2 (1 font-lock-function-name-face)))
+    ;; ACTIVE_ESCAPE     172 src/dialog.cc    #undef ACTIVE_ESCAPE
+    (`ctags-x '("^\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\)[ \t]+\\(\\(?:[^/\n]*/\\)?[^ \t\n]+\\)"
+                3 2 nil nil 3 (1 font-lock-function-name-face)))
+    ;; src/dialog.cc:172:#undef ACTIVE_ESCAPE
+    (`grep '("^\\(.+?\\):\\([0-9]+\\):" 1 2 nil nil 1))
+    ;; src/dialog.cc ACTIVE_ESCAPE 172 #undef ACTIVE_ESCAPE
+    (`cscope '("^\\(.+?\\)[ \t]+\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\)"
+               1 3 nil nil 1 (2 font-lock-function-name-face)))))
+
 (define-compilation-mode ggtags-global-mode "Global"
   "A mode for showing outputs from gnu global."
+  (when (ggtags-global-output-format-error-regexp)
+    (setq-local compilation-error-regexp-alist
+                (cons (ggtags-global-output-format-error-regexp)
+                      compilation-error-regexp-alist)))
   (setq-local compilation-auto-jump-to-first-error
               ggtags-auto-jump-to-first-match)
   (setq-local compilation-scroll-output 'first-error)
