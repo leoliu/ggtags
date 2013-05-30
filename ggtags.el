@@ -52,7 +52,6 @@
 
 (eval-when-compile (require 'cl))
 (require 'compile)
-(require 'etags)                        ; for find-tag-marker-ring
 
 (if (not (fboundp 'comment-string-strip))
     (autoload 'comment-string-strip "newcomment"))
@@ -237,6 +236,7 @@ If point is at a definition tag, find references, and vice versa.
 When called with prefix, ask the name and kind of tag."
   (interactive (list (ggtags-read-tag (not current-prefix-arg))
                      current-prefix-arg))
+  (eval-and-compile (require 'etags))
   (ggtags-check-root-directory)
   (ggtags-navigation-mode +1)
   (ring-insert find-tag-marker-ring (point-marker))
@@ -436,10 +436,29 @@ When called with prefix, ask the name and kind of tag."
 
 (defvar ggtags-tag-overlay nil)
 (defvar ggtags-highlight-tag-timer nil)
-(make-variable-buffer-local 'ggtags-tag-overlay)
 
-(defun ggtags-highlight-tag-at-point (buffer)
-  (when (eq buffer (current-buffer))
+(defvar ggtags-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "\M-." 'ggtags-find-tag)
+    (define-key map "\M-," 'ggtags-find-tag-resume)
+    (define-key map "\C-c\M-k" 'ggtags-kill-file-buffers)
+    map))
+
+;;;###autoload
+(define-minor-mode ggtags-mode nil
+  :lighter (:eval (if ggtags-navigation-mode "" " GG"))
+  (if ggtags-mode
+      (progn
+        (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
+        (or (executable-find "global")
+            (message "Failed to find GNU Global")))
+    (remove-hook 'after-save-hook 'ggtags-after-save-function t)
+    (and (overlayp ggtags-tag-overlay)
+         (delete-overlay ggtags-tag-overlay))
+    (setq ggtags-tag-overlay nil)))
+
+(defun ggtags-highlight-tag-at-point ()
+  (when ggtags-mode
     (unless (overlayp ggtags-tag-overlay)
       (setq ggtags-tag-overlay (make-overlay (point) (point)))
       (overlay-put ggtags-tag-overlay 'ggtags t))
@@ -457,39 +476,10 @@ When called with prefix, ask the name and kind of tag."
       (cond
        ((not bounds)
         (overlay-put ggtags-tag-overlay 'face nil)
-        (move-overlay ggtags-tag-overlay (point) (point)))
+        (move-overlay ggtags-tag-overlay (point) (point) (current-buffer)))
        ((not (funcall done-p))
-        (move-overlay o (car bounds) (cdr bounds))
+        (move-overlay o (car bounds) (cdr bounds) (current-buffer))
         (overlay-put o 'face (and valid-tag 'ggtags-highlight)))))))
-
-(defun ggtags-post-command-function ()
-  (when (timerp ggtags-highlight-tag-timer)
-    (cancel-timer ggtags-highlight-tag-timer))
-  (setq ggtags-highlight-tag-timer
-        (run-with-idle-timer 0.2 nil 'ggtags-highlight-tag-at-point
-                             (current-buffer))))
-
-(defvar ggtags-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "\M-." 'ggtags-find-tag)
-    (define-key map "\M-," 'ggtags-find-tag-resume)
-    (define-key map "\C-c\M-k" 'ggtags-kill-file-buffers)
-    map))
-
-;;;###autoload
-(define-minor-mode ggtags-mode nil
-  :lighter (:eval (if ggtags-navigation-mode "" " GG"))
-  (if ggtags-mode
-      (progn
-        (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
-        (if (executable-find "global")
-            (add-hook 'post-command-hook 'ggtags-post-command-function nil t)
-          (message "Failed to find GNU Global")))
-    (remove-hook 'after-save-hook 'ggtags-after-save-function t)
-    (remove-hook 'post-command-hook 'ggtags-post-command-function t)
-    (and (overlayp ggtags-tag-overlay)
-         (delete-overlay ggtags-tag-overlay))
-    (setq ggtags-tag-overlay nil)))
 
 ;;; imenu
 
@@ -541,6 +531,12 @@ When called with prefix, ask the name and kind of tag."
       t)))
 
 ;;; Finish up
+
+(when ggtags-highlight-tag-timer
+  (cancel-timer ggtags-highlight-tag-timer))
+
+(setq ggtags-highlight-tag-timer
+      (run-with-idle-timer 0.2 t 'ggtags-highlight-tag-at-point))
 
 ;; Higher priority for `ggtags-navigation-mode' to avoid being
 ;; hijacked by modes such as `view-mode'.
