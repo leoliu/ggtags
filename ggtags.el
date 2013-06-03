@@ -258,7 +258,7 @@ When called with prefix, ask the name and kind of tag."
                  (if (y-or-n-p "Find definition (n for reference)? ")
                      "" "-r")
                  name)
-       (format "global %s --from-here=%d:%s \"%s\""
+       (format "global %s --from-here=%d:'%s' \"%s\""
                (ggtags-global-options)
                (line-number-at-pos)
                (expand-file-name (file-truename buffer-file-name))
@@ -272,7 +272,10 @@ When called with prefix, ask the name and kind of tag."
     (let ((split-window-preferred-function ggtags-split-window-function))
       (compile-goto-error))))
 
+(defvar-local ggtags-global-exit-status nil)
+
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
+  (setq ggtags-global-exit-status exit-status)
   (let ((count (save-excursion
                  (goto-char (point-max))
                  (if (re-search-backward "^\\([0-9]+\\) \\w+ located" nil t)
@@ -338,29 +341,27 @@ When called with prefix, ask the name and kind of tag."
           (ggtags-abbreviate-file (match-beginning sub) (match-end sub)))))))
 
 (defun ggtags-handle-single-match (buf _how)
-  (unless (or (not ggtags-auto-jump-to-first-match)
-              (save-excursion
-                (goto-char (point-min))
-                (ignore-errors
-                  (goto-char (compilation-next-single-property-change
-                              (point) 'compilation-message))
-                  (end-of-line)
-                  (compilation-next-single-property-change
-                   (point) 'compilation-message))))
+  (when (and ggtags-auto-jump-to-first-match
+             ;; If exit abnormally keep the window for inspection.
+             (zerop ggtags-global-exit-status)
+             (save-excursion
+               (goto-char (point-min))
+               (not (ignore-errors
+                      (goto-char (compilation-next-single-property-change
+                                  (point) 'compilation-message))
+                      (end-of-line)
+                      (compilation-next-single-property-change
+                       (point) 'compilation-message)))))
     (ggtags-navigation-mode -1)
     ;; 0.5s delay for `ggtags-auto-jump-to-first-match'
     (sit-for 0)                    ; See: http://debbugs.gnu.org/13829
     (ggtags-navigation-mode-cleanup buf 0.5)))
 
 (defvar ggtags-global-mode-font-lock-keywords
-  '(("^-[*]-.*-[*]-$"
-     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
-    ("^\\w+ not found.*\\|^[0-9]+ \\w+ located.*"
-     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
-    ("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
-     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t)
-     (1 compilation-error-face)
-     (2 compilation-error-face nil t))))
+  '(("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
+     (1 'compilation-error)
+     (2 'compilation-error nil t))
+    ("^Global found \\([0-9]+\\)" (1 compilation-info-face))))
 
 (define-compilation-mode ggtags-global-mode "Global"
   "A mode for showing outputs from gnu global."
