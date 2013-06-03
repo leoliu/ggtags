@@ -245,8 +245,8 @@ If point is at a definition tag, find references, and vice versa.
 When called with prefix, ask the name and kind of tag."
   (interactive (list (ggtags-read-tag (not current-prefix-arg))
                      current-prefix-arg))
-  (eval-and-compile (require 'etags))
   (ggtags-check-root-directory)
+  (eval-and-compile (require 'etags))
   (ggtags-navigation-mode +1)
   (ring-insert find-tag-marker-ring (point-marker))
   (let ((split-window-preferred-function ggtags-split-window-function)
@@ -258,10 +258,11 @@ When called with prefix, ask the name and kind of tag."
                  (if (y-or-n-p "Find definition (n for reference)? ")
                      "" "-r")
                  name)
-       (format "global %s --from-here=%d:'%s' \"%s\""
+       (format "global %s --from-here=%d:%s \"%s\""
                (ggtags-global-options)
                (line-number-at-pos)
-               (expand-file-name (file-truename buffer-file-name))
+               (shell-quote-argument
+                (expand-file-name (file-truename buffer-file-name)))
                name))
      'ggtags-global-mode)))
 
@@ -271,6 +272,35 @@ When called with prefix, ask the name and kind of tag."
     (ggtags-navigation-mode +1)
     (let ((split-window-preferred-function ggtags-split-window-function))
       (compile-goto-error))))
+
+;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
+(defun ggtags-list-tags (regexp file-or-directory)
+  "List all tags matching REGEXP in FILE-OR-DIRECTORY."
+  (interactive (list (read-string "POSIX regexp: ")
+                     (read-file-name "Directory: "
+                                     (if current-prefix-arg
+                                         (ggtags-root-directory)
+                                       default-directory)
+                                     buffer-file-name t)))
+  (let ((split-window-preferred-function ggtags-split-window-function)
+        (default-directory (if (file-directory-p file-or-directory)
+                               (file-name-as-directory file-or-directory)
+                             (file-name-directory file-or-directory))))
+    (ggtags-check-root-directory)
+    (eval-and-compile (require 'etags))
+    (ggtags-navigation-mode +1)
+    (ring-insert find-tag-marker-ring (point-marker))
+    (with-current-buffer
+        (compilation-start (format "global %s -e %s %s"
+                                   (ggtags-global-options)
+                                   regexp
+                                   (if (file-directory-p file-or-directory)
+                                       "-l ."
+                                     (concat "-f " (file-name-nondirectory
+                                                    file-or-directory))))
+                           'ggtags-global-mode)
+      (setq-local compilation-auto-jump-to-first-error nil)
+      (remove-hook 'compilation-finish-functions 'ggtags-handle-single-match t))))
 
 (defvar-local ggtags-global-exit-status nil)
 
