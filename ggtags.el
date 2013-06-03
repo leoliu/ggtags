@@ -185,17 +185,19 @@ Return -1 if it does not exist."
 
 (defun ggtags-ensure-root-directory ()
   (or (ggtags-root-directory)
-      (if (yes-or-no-p "File GTAGS not found; run gtags? ")
-          (let ((root (read-directory-name "Directory: " nil nil t)))
-            (and (= (length root) 0) (error "No directory chosen"))
-            (with-temp-buffer
-              (if (zerop (let ((default-directory
-                                 (file-name-as-directory root)))
-                           (call-process "gtags" nil t)))
-                  (message "File GTAGS generated in `%s'"
-                           (ggtags-root-directory))
-                (error "%s" (comment-string-strip (buffer-string) t t)))))
-        (error "Aborted"))))
+      (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
+                (error "Aborted"))
+        (let ((root (read-directory-name "Directory: " nil nil t)))
+          (and (= (length root) 0) (error "No directory chosen"))
+          (when (with-temp-buffer
+                  (let ((default-directory
+                          (file-name-as-directory root)))
+                    (or (zerop (call-process "gtags" nil t))
+                        (error "%s" (comment-string-strip
+                                     (buffer-string) t t)))))
+            (kill-local-variable 'ggtags-root-directory)
+            (message "File GTAGS generated in `%s'"
+                     (ggtags-root-directory)))))))
 
 (defun ggtags-tag-names-1 (root &optional prefix)
   (when root
@@ -296,8 +298,9 @@ When called with prefix, ask the name and kind of tag."
                                    regexp
                                    (if (file-directory-p file-or-directory)
                                        "-l ."
-                                     (concat "-f " (file-name-nondirectory
-                                                    file-or-directory))))
+                                     (concat "-f " (shell-quote-argument
+                                                    (file-name-nondirectory
+                                                     file-or-directory)))))
                            'ggtags-global-mode)
       (setq-local compilation-auto-jump-to-first-error nil)
       (remove-hook 'compilation-finish-functions 'ggtags-handle-single-match t))))
