@@ -283,6 +283,27 @@ When called with prefix, ask the name and kind of tag."
             (format "found %d %s" count (if (= count 1) "match" "matches")))
           exit-status)))
 
+;;; NOTE: Must not match the 'Global started at Mon Jun 3 10:24:13'
+;;; line or `compilation-auto-jump' will jump there and fail. See
+;;; comments before the 'gnu' entry in
+;;; `compilation-error-regexp-alist-alist'.
+(defvar ggtags-global-error-regexp-alist-alist
+  (append
+   '((path "^\\(?:[^/\n]*/\\)?[^ )\t\n]+$" 0)
+     ;; ACTIVE_ESCAPE	src/dialog.cc	172
+     (ctags "^\\([^ \t\n]+\\)[ \t]+\\(.*?\\)[ \t]+\\([0-9]+\\)$"
+            2 3 nil nil 2 (1 font-lock-function-name-face))
+     ;; ACTIVE_ESCAPE     172 src/dialog.cc    #undef ACTIVE_ESCAPE
+     (ctags-x "^\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\)[ \t]+\\(\\(?:[^/\n]*/\\)?[^ \t\n]+\\)"
+              3 2 nil nil 3 (1 font-lock-function-name-face))
+     ;; src/dialog.cc:172:#undef ACTIVE_ESCAPE
+     (grep "^\\(.+?\\):\\([0-9]+\\):\\(?:[^0-9\n]\\|[0-9][^0-9\n]\\|[0-9][0-9].\\)"
+           1 2 nil nil 1)
+     ;; src/dialog.cc ACTIVE_ESCAPE 172 #undef ACTIVE_ESCAPE
+     (cscope "^\\(.+?\\)[ \t]+\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\).*\\(?:[^0-9\n]\\|[^0-9\n][0-9]\\|[^:\n][0-9][0-9]\\)$"
+             1 3 nil nil 1 (2 font-lock-function-name-face)))
+   compilation-error-regexp-alist-alist))
+
 (defun ggtags-abbreviate-file (start end)
   (let ((inhibit-read-only t)
         (amount (if (numberp ggtags-global-abbreviate-filename)
@@ -303,10 +324,10 @@ When called with prefix, ask the name and kind of tag."
 
 (defun ggtags-abbreviate-files (start end)
   (goto-char start)
-  (when (and ggtags-global-abbreviate-filename
-             (ggtags-global-output-format-error-regexp))
-    (let* ((error-re (ggtags-global-output-format-error-regexp))
-           (sub (cadr error-re)))
+  (let* ((error-re (cdr (assq ggtags-global-output-format
+                              ggtags-global-error-regexp-alist-alist)))
+         (sub (cadr error-re)))
+    (when (and ggtags-global-abbreviate-filename error-re)
       (while (re-search-forward (car error-re) end t)
         (when (and (or (not (numberp ggtags-global-abbreviate-filename))
                        (> (length (match-string sub))
@@ -336,38 +357,15 @@ When called with prefix, ask the name and kind of tag."
      (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
     ("^\\w+ not found.*\\|^[0-9]+ \\w+ located.*"
      (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
-    ("^[Gg]lobal \\(?:started\\)?.*"
-     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t))
-    ("^Global found \\([0-9]+\\).*"
-     (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t)
-     (1 compilation-info-face nil t))
     ("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
      (0 '(face nil compilation-message nil help-echo nil mouse-face nil) t)
      (1 compilation-error-face)
      (2 compilation-error-face nil t))))
 
-(defun ggtags-global-output-format-error-regexp ()
-  "Error regexp according to `ggtags-global-output-format'."
-  (pcase ggtags-global-output-format
-    (`path '("^[^ \t\n]+$" 0))
-    ;; ACTIVE_ESCAPE	src/dialog.cc	172
-    (`ctags '("^\\([^ \t\n]+\\)[ \t]+\\(.*?\\)[ \t]+\\([0-9]+\\)"
-              2 3 nil nil 2 (1 font-lock-function-name-face)))
-    ;; ACTIVE_ESCAPE     172 src/dialog.cc    #undef ACTIVE_ESCAPE
-    (`ctags-x '("^\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\)[ \t]+\\(\\(?:[^/\n]*/\\)?[^ \t\n]+\\)"
-                3 2 nil nil 3 (1 font-lock-function-name-face)))
-    ;; src/dialog.cc:172:#undef ACTIVE_ESCAPE
-    (`grep '("^\\(.+?\\):\\([0-9]+\\):" 1 2 nil nil 1))
-    ;; src/dialog.cc ACTIVE_ESCAPE 172 #undef ACTIVE_ESCAPE
-    (`cscope '("^\\(.+?\\)[ \t]+\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\)"
-               1 3 nil nil 1 (2 font-lock-function-name-face)))))
-
 (define-compilation-mode ggtags-global-mode "Global"
   "A mode for showing outputs from gnu global."
-  (when (ggtags-global-output-format-error-regexp)
-    (setq-local compilation-error-regexp-alist
-                (cons (ggtags-global-output-format-error-regexp)
-                      compilation-error-regexp-alist)))
+  (setq-local compilation-error-regexp-alist
+              (list ggtags-global-output-format))
   (setq-local compilation-auto-jump-to-first-error
               ggtags-auto-jump-to-first-match)
   (setq-local compilation-scroll-output 'first-error)
