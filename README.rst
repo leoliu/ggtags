@@ -17,6 +17,8 @@ Features
 #. Highlight valid tag at point
 #. Built on top of ``compile.el`` (asynchonrous and other nice
    features)
+#. Support all  output formats  of ``global``:  ``grep``, ``ctags-x``,
+   ``cscope`` etc.
 #. Abbreviated display of file names
 
 Why GNU Global
@@ -24,7 +26,7 @@ Why GNU Global
 
 The opengrok project composed a feature comparison table between a few
 tools. The `page
-<http://hub.opensolaris.org/bin/view/Project+opengrok>`_ is taken
+<http://hub.opensolaris.org/bin/view/Project+opengrok>`_ was taken
 offline after 2013-03-24 but `here <http://i.imgur.com/IQCPQ0j.png>`_
 is a backup.
 
