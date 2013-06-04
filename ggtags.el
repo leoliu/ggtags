@@ -110,6 +110,11 @@ If nil, use Emacs default."
                  (const cscope))
   :group 'ggtags)
 
+(defcustom ggtags-completing-read-function completing-read-function
+  "Ggtags specific `completing-read-function' (which see)."
+  :type 'function
+  :group 'ggtags)
+
 (defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY TIMESTAMP)
 
 (defvar ggtags-current-tag-name nil)
@@ -227,7 +232,8 @@ Return -1 if it does not exist."
 
 (defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
-  (let ((default (thing-at-point 'symbol)))
+  (let ((default (thing-at-point 'symbol))
+        (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
           (if quick (or default (user-error "No tag at point"))
             (completing-read
