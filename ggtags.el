@@ -227,14 +227,12 @@ Return -1 if it does not exist."
 
 (defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
-  (let* ((tags (ggtags-tag-names))
-         (sym (thing-at-point 'symbol))
-         (default (and (member sym tags) sym)))
+  (let ((default (thing-at-point 'symbol)))
     (setq ggtags-current-tag-name
-          (if quick (or default (error "No valid tag at point"))
+          (if quick (or default (user-error "No tag at point"))
             (completing-read
              (format (if default "Tag (default %s): " "Tag: ") default)
-             tags nil t nil nil default)))))
+             (ggtags-tag-names) nil t nil nil default)))))
 
 (defun ggtags-global-options ()
   (concat "-v --result="
@@ -249,17 +247,20 @@ When called with prefix, ask the name and kind of tag."
   (interactive (list (ggtags-read-tag (not current-prefix-arg))
                      current-prefix-arg))
   (ggtags-check-root-directory)
-  (eval-and-compile (require 'etags))
-  (ggtags-navigation-mode +1)
-  (ring-insert find-tag-marker-ring (point-marker))
   (let ((split-window-preferred-function ggtags-split-window-function)
-        (default-directory (ggtags-root-directory)))
+        (default-directory (ggtags-root-directory))
+        (help-char ??)
+        (help-form "\
+d: definitions          (-d)
+r: references           (-r)
+s: symbols              (-s)
+?: show this help\n"))
     (compilation-start
      (if (or verbose (not buffer-file-name))
-         (format "global %s %s \"%s\""
+         (format "global %s -%s \"%s\""
                  (ggtags-global-options)
-                 (if (y-or-n-p "Find definition (n for reference)? ")
-                     "" "-r")
+                 (char-to-string
+                  (read-char-choice "Tag type? (d/r/s/?) " '(?d ?r ?s)))
                  name)
        (format "global %s --from-here=%d:%s \"%s\""
                (ggtags-global-options)
@@ -267,7 +268,10 @@ When called with prefix, ask the name and kind of tag."
                (shell-quote-argument
                 (expand-file-name (file-truename buffer-file-name)))
                name))
-     'ggtags-global-mode)))
+     'ggtags-global-mode))
+  (eval-and-compile (require 'etags))
+  (ring-insert find-tag-marker-ring (point-marker))
+  (ggtags-navigation-mode +1))
 
 (defun ggtags-find-tag-resume ()
   (interactive)
