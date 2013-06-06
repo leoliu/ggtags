@@ -38,12 +38,22 @@ Screenshot
    :target: http://i.imgur.com/d430rmm.png
    :alt: ggtags.png
 
+Config
+~~~~~~
+
+Enable ``ggtags-mode`` for C/C++/Java modes::
+
+    (add-hook 'c-mode-common-hook
+              (lambda ()
+                (when (derived-mode-p 'c-mode 'c++-mode 'java-mode)
+                  (ggtags-mode 1))))
+
 Tutorial
 ~~~~~~~~
 
 Type ``M-x ggtags-mode`` to enable the minor mode, or as usual enable
 it in your desired major mode hooks. When the mode is on the symbol at
-point is underlined if it is a valid tag.
+point is underlined if it is a valid (definition) tag.
 
 ``M-.`` finds definitions or references according to the tag at point,
 i.e. if point is at a definition tag find references and vice versa.
