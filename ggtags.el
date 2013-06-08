@@ -97,8 +97,10 @@ If nil, use Emacs default."
   :group 'ggtags)
 
 (defcustom ggtags-oversize-limit (* 50 1024 1024)
-  "The size limit for the  GTAGS file."
-  :type 'number
+  "The over size limit for the  GTAGS file."
+  :type '(choice (const :tag "None" nil)
+                 (const :tag "Always" t)
+                 number)
   :group 'ggtags)
 
 (defcustom ggtags-split-window-function split-window-preferred-function
@@ -631,7 +633,7 @@ s: symbols              (-s)
     (let* ((bounds (bounds-of-thing-at-point 'symbol))
            (valid-tag (when bounds
                         (member (buffer-substring (car bounds) (cdr bounds))
-                                (ggtags-tag-names nil (ggtags-oversize-p)))))
+                                (ggtags-tag-names (ggtags-oversize-p)))))
            (o ggtags-tag-overlay)
            (done-p (lambda ()
                      (and (memq o (overlays-at (car bounds)))
