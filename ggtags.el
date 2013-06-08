@@ -96,6 +96,11 @@ If nil, use Emacs default."
                  integer)
   :group 'ggtags)
 
+(defcustom ggtags-oversize-limit (* 50 1024 1024)
+  "The size limit for the  GTAGS file."
+  :type 'number
+  :group 'ggtags)
+
 (defcustom ggtags-split-window-function split-window-preferred-function
   "A function to control how ggtags pops up the auxiliary window."
   :type 'function
@@ -139,6 +144,16 @@ If nil, use Emacs default."
                 (derived-mode-p 'ggtags-global-mode)))
          (error "No global buffer found"))
      (with-current-buffer compilation-last-buffer ,@body)))
+
+(defun ggtags-oversize-p ()
+  (pcase ggtags-oversize-limit
+    (`nil nil)
+    (`t t)
+    (t (when (ggtags-root-directory)
+         (> (or (nth 7 (file-attributes
+                        (expand-file-name "GTAGS" (ggtags-root-directory))))
+                0)
+            ggtags-oversize-limit)))))
 
 (defun ggtags-get-timestamp (root)
   "Get the timestamp (float) of file GTAGS in ROOT directory.
@@ -208,26 +223,29 @@ Return -1 if it does not exist."
             (message "File GTAGS generated in `%s'"
                      (ggtags-root-directory)))))))
 
-(defun ggtags-tag-names-1 (root &optional prefix)
+(defun ggtags-tag-names-1 (root &optional from-cache)
   (when root
-    (if (ggtags-cache-stale-p root)
+    (if (and (not from-cache) (ggtags-cache-stale-p root))
         (let* ((default-directory (file-name-as-directory root))
                (tags (with-demoted-errors
-                       (process-lines "global" "-c" (or prefix "")))))
+                       (process-lines "global" "-c" ""))))
           (and tags (ggtags-cache-set root tags))
           tags)
       (cadr (ggtags-cache-get root)))))
 
 ;;;###autoload
-(defun ggtags-tag-names (&optional prefix)
-  "Get a list of tag names starting with PREFIX."
+(defun ggtags-tag-names (&optional from-cache)
+  "Get a list of tag names."
   (let ((root (ggtags-root-directory)))
-    (when (and root (ggtags-cache-dirty-p root))
+    (when (and root
+               (not (ggtags-oversize-p))
+               (not from-cache)
+               (ggtags-cache-dirty-p root))
       (if (zerop (call-process "global" nil nil nil "-u"))
           (ggtags-cache-mark-dirty root nil)
         (message "ggtags: error running 'global -u'")))
     (apply 'append (mapcar (lambda (r)
-                             (ggtags-tag-names-1 r prefix))
+                             (ggtags-tag-names-1 r from-cache))
                            (cons root (ggtags-get-libpath))))))
 
 (defun ggtags-read-tag (quick)
@@ -238,7 +256,10 @@ Return -1 if it does not exist."
           (if quick (or default (user-error "No tag at point"))
             (completing-read
              (format (if default "Tag (default %s): " "Tag: ") default)
-             (ggtags-tag-names) nil t nil nil default)))))
+             ;; XXX: build tag names more lazily such as using
+             ;; `completion-table-dynamic'.
+             (ggtags-tag-names)
+             nil t nil nil default)))))
 
 (defun ggtags-global-options ()
   (concat "-v --result="
@@ -570,7 +591,14 @@ s: symbols              (-s)
 
 (defun ggtags-after-save-function ()
   (let ((root (with-demoted-errors (ggtags-root-directory))))
-    (and root (ggtags-cache-mark-dirty root t))))
+    (when root
+      (ggtags-cache-mark-dirty root t)
+      ;; When oversize update on a per-save basis.
+      (when (and buffer-file-name (ggtags-oversize-p))
+        (with-demoted-errors
+          (call-process "global" nil 0 nil
+                        "--single-update"
+                        (file-truename buffer-file-name)))))))
 
 (defvar ggtags-tag-overlay nil)
 (defvar ggtags-highlight-tag-timer nil)
@@ -603,7 +631,7 @@ s: symbols              (-s)
     (let* ((bounds (bounds-of-thing-at-point 'symbol))
            (valid-tag (when bounds
                         (member (buffer-substring (car bounds) (cdr bounds))
-                                (ggtags-tag-names))))
+                                (ggtags-tag-names nil (ggtags-oversize-p)))))
            (o ggtags-tag-overlay)
            (done-p (lambda ()
                      (and (memq o (overlays-at (car bounds)))
