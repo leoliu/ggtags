@@ -193,18 +193,17 @@ Return -1 if it does not exist."
   (> (ggtags-get-timestamp key)
      (or (fourth (ggtags-cache-get key)) 0)))
 
-(defvar-local ggtags-root-directory 'unset
+(defvar-local ggtags-root-directory nil
   "Internal; use function `ggtags-root-directory' instead.")
 
 ;;;###autoload
 (defun ggtags-root-directory ()
-  (if (string-or-null-p ggtags-root-directory)
-      ggtags-root-directory
-    (setq ggtags-root-directory
-          (with-temp-buffer
-            (when (zerop (call-process "global" nil (list t nil) nil "-pr"))
-              (file-name-as-directory
-               (comment-string-strip (buffer-string) t t)))))))
+  (or ggtags-root-directory
+      (setq ggtags-root-directory
+            (with-temp-buffer
+              (when (zerop (call-process "global" nil (list t nil) nil "-pr"))
+                (file-name-as-directory
+                 (comment-string-strip (buffer-string) t t)))))))
 
 (defun ggtags-check-root-directory ()
   (or (ggtags-root-directory) (error "File GTAGS not found")))
@@ -221,7 +220,6 @@ Return -1 if it does not exist."
                     (or (zerop (call-process "gtags" nil t))
                         (error "%s" (comment-string-strip
                                      (buffer-string) t t)))))
-            (kill-local-variable 'ggtags-root-directory)
             (message "File GTAGS generated in `%s'"
                      (ggtags-root-directory)))))))
 
