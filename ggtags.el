@@ -385,6 +385,27 @@ s: symbols              (-s)
           (when (window-live-p win)
             (quit-window t win)))))))
 
+(defvar ggtags-current-mark nil)
+
+(defun ggtags-next-mark (&optional arg)
+  "Move to the next mark in the tag marker ring."
+  (interactive)
+  (or (<= (ring-length find-tag-marker-ring) 1)
+      (user-error "No %s mark" (if arg "previous" "next")))
+  (let ((mark (or (and ggtags-current-mark
+                       (funcall (if arg #'ring-previous #'ring-next)
+                                find-tag-marker-ring ggtags-current-mark))
+                  (ring-ref find-tag-marker-ring
+                            (funcall (if arg #'ring-minus1 #'ring-plus1)
+                                     0 (ring-length find-tag-marker-ring))))))
+    (switch-to-buffer (marker-buffer mark))
+    (goto-char mark)
+    (setq ggtags-current-mark mark)))
+
+(defun ggtags-prev-mark ()
+  (interactive)
+  (ggtags-next-mark 'previous))
+
 (defvar-local ggtags-global-exit-status nil)
 
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
