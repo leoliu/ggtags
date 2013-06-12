@@ -390,14 +390,15 @@ s: symbols              (-s)
 (defun ggtags-next-mark (&optional arg)
   "Move to the next mark in the tag marker ring."
   (interactive)
-  (or (<= (ring-length find-tag-marker-ring) 1)
+  (or (> (ring-length find-tag-marker-ring) 1)
       (user-error "No %s mark" (if arg "previous" "next")))
   (let ((mark (or (and ggtags-current-mark
+                       (marker-buffer ggtags-current-mark)
                        (funcall (if arg #'ring-previous #'ring-next)
                                 find-tag-marker-ring ggtags-current-mark))
-                  (ring-ref find-tag-marker-ring
-                            (funcall (if arg #'ring-minus1 #'ring-plus1)
-                                     0 (ring-length find-tag-marker-ring))))))
+                  (progn
+                    (ring-insert find-tag-marker-ring (point-marker))
+                    (ring-ref find-tag-marker-ring 0)))))
     (switch-to-buffer (marker-buffer mark))
     (goto-char mark)
     (setq ggtags-current-mark mark)))
