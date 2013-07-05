@@ -133,10 +133,14 @@ If nil, use Emacs default."
 ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
 (defvar ggtags-global-has-path-style    ; introduced in global 6.2.8
   (with-demoted-errors                  ; in case `global' not found
-    (and (string-match-p "^--path-style "
-                         (shell-command-to-string "global --help"))
-         t))
+    (zerop (call-process "global" nil nil nil
+                         "--path-style" "shorter" "--help")))
   "Non-nil if `global' supports --path-style switch.")
+
+;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
+(defvar ggtags-global-has-color         ; introduced in global 6.2.9
+  (with-demoted-errors
+    (zerop (call-process "global" nil nil nil "--color" "--help"))))
 
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
@@ -264,6 +268,7 @@ Return -1 if it does not exist."
 (defun ggtags-global-options ()
   (concat "-v --result="
           (symbol-name ggtags-global-output-format)
+          (and ggtags-global-has-color " --color")
           (and ggtags-global-has-path-style " --path-style=shorter")))
 
 ;;;###autoload
@@ -475,6 +480,10 @@ s: symbols              (-s)
                    (get-text-property (match-beginning sub) 'compilation-message))
           (ggtags-abbreviate-file (match-beginning sub) (match-end sub)))))))
 
+(defun ggtags-global-filter ()
+  "Called from `compilation-filter-hook' (which see)."
+  (ansi-color-apply-on-region compilation-filter-start (point)))
+
 (defun ggtags-handle-single-match (buf _how)
   (when (and ggtags-auto-jump-to-first-match
              ;; If exit abnormally keep the window for inspection.
@@ -512,6 +521,7 @@ s: symbols              (-s)
               'ggtags-global-exit-message-function)
   (setq-local truncate-lines t)
   (jit-lock-register #'ggtags-abbreviate-files)
+  (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
   (add-hook 'compilation-finish-functions 'ggtags-handle-single-match nil t)
   (define-key ggtags-global-mode-map "o" 'visible-mode))
 
