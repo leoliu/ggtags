@@ -254,7 +254,7 @@ Return -1 if it does not exist."
 
 (defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
-  (let ((default (thing-at-point 'symbol))
+  (let ((default (tap-thing-nearest-point 'symbol))
         (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
           (if quick (or default (user-error "No tag at point"))
@@ -272,12 +272,12 @@ Return -1 if it does not exist."
           (and ggtags-global-has-path-style " --path-style=shorter")))
 
 ;;;###autoload
-(defun ggtags-find-tag (name &optional verbose)
+(defun ggtags-find-tag-verbose (name &optional verbose)
   "Find definitions or references to tag NAME by context.
 If point is at a definition tag, find references, and vice versa.
 When called with prefix, ask the name and kind of tag."
-  (interactive (list (ggtags-read-tag (not current-prefix-arg))
-                     current-prefix-arg))
+  (interactive (list (ggtags-read-tag current-prefix-arg)
+                     (not current-prefix-arg)))
   (ggtags-check-root-directory)
   (let ((split-window-preferred-function ggtags-split-window-function)
         (default-directory (ggtags-root-directory))
@@ -312,6 +312,41 @@ s: symbols              (-s)
     (let ((split-window-preferred-function ggtags-split-window-function))
       (compile-goto-error))))
 
+;;;###autoload
+(defun ggtags-find-tag (name &optional verbose)
+  "Find definitions or references to tag NAME by context.
+If point is at a definition tag, find references, and vice versa.
+When called with prefix, ask the name and kind of tag."
+  (interactive (list (ggtags-read-tag current-prefix-arg)
+                     (not current-prefix-arg)))
+  (ggtags-check-root-directory)
+  (let ((split-window-preferred-function ggtags-split-window-function)
+        (default-directory (ggtags-root-directory))
+        (help-char ??)
+        (help-form "\
+d: definitions          (-d)
+r: references           (-r)
+s: symbols              (-s)
+?: show this help\n"))
+    (compilation-start
+	 (format "global %s --from-here=%d:%s \"%s\""
+			 (ggtags-global-options)
+			 (line-number-at-pos)
+			 (shell-quote-argument
+			  (expand-file-name (file-truename buffer-file-name)))
+			 name)
+     'ggtags-global-mode))
+  (eval-and-compile (require 'etags))
+  (ring-insert find-tag-marker-ring (point-marker))
+  (ggtags-navigation-mode +1))
+
+(defun ggtags-find-tag-resume ()
+  (interactive)
+  (ggtags-ensure-global-buffer
+    (ggtags-navigation-mode +1)
+    (let ((split-window-preferred-function ggtags-split-window-function))
+      (compile-goto-error))))
+      
 ;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
 (defun ggtags-list-tags (regexp file-or-directory)
   "List all tags matching REGEXP in FILE-OR-DIRECTORY."
@@ -536,7 +571,8 @@ s: symbols              (-s)
     (define-key map "\r" 'ggtags-navigation-mode-done)
     ;; Intercept M-. and M-* keys
     (define-key map [remap pop-tag-mark] 'ggtags-navigation-mode-abort)
-    (define-key map [remap ggtags-find-tag] 'undefined)
+;;    (define-key map [remap ggtags-find-tag] 'undefined)
+    (define-key map "\M-." 'ggtags-find-tag)
     map))
 
 (defun ggtags-move-to-tag (&optional name)
