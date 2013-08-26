@@ -52,6 +52,7 @@
 
 (eval-when-compile (require 'cl))
 (require 'compile)
+(require 'thingatpt+)
 
 (if (not (fboundp 'comment-string-strip))
     (autoload 'comment-string-strip "newcomment"))
