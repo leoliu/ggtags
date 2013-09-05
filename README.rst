@@ -24,11 +24,9 @@ Features
 Why GNU Global
 ~~~~~~~~~~~~~~
 
-The opengrok project composed a feature comparison table between a few
-tools. The `page
-<http://hub.opensolaris.org/bin/view/Project+opengrok>`_ was taken
-offline after 2013-03-24 but `here <http://i.imgur.com/IQCPQ0j.png>`_
-is a backup.
+The opengrok project composed a feature comparison `table
+<https://github.com/OpenGrok/OpenGrok/wiki/Comparison-with-Similar-Tools>`_
+between a few tools.
 
 Screenshot
 ~~~~~~~~~~
@@ -74,8 +72,8 @@ files tracked by GNU Global. ``C-c M-k`` helps clean them up.
 Development
 ~~~~~~~~~~~
 
-The goal is to make working with GNU Global in Emacs as effortless and
-intuitively as possible.
+The goal is to make working with GNU Global in Emacs as effortlessly
+and intuitively as possible.
 
 Bugs
 ~~~~
