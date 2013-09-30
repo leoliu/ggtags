@@ -1,4 +1,4 @@
-;;; ggtags.el --- GNU Global source code tagging system -*- lexical-binding: t; -*-
+;;; ggtags.el --- GNU Global source code tagging system  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
@@ -303,6 +303,8 @@ s: symbols              (-s)
      'ggtags-global-mode))
   (eval-and-compile (require 'etags))
   (ring-insert find-tag-marker-ring (point-marker))
+  (setq tags-loop-scan t
+        tags-loop-operate '(ggtags-find-tag-resume))
   (ggtags-navigation-mode +1))
 
 (defun ggtags-find-tag-resume ()
@@ -639,7 +641,6 @@ s: symbols              (-s)
 (defvar ggtags-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\M-." 'ggtags-find-tag)
-    (define-key map "\M-," 'ggtags-find-tag-resume)
     (define-key map "\C-c\M-k" 'ggtags-kill-file-buffers)
     map))
 
