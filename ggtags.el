@@ -46,7 +46,7 @@
 ;; resume the search using `M-,'. To abort the search press `M-*'.
 ;;
 ;; Normally after a few searches a dozen buffers are created visiting
-;; files tracked by GNU Global. `C-c M-k' helps clean them up.
+;; files tracked by GNU Global. `C-c k' helps clean them up.
 
 ;;; Code:
 
@@ -117,12 +117,17 @@ If nil, use Emacs default."
                  (const cscope))
   :group 'ggtags)
 
+(defcustom ggtags-mode-prefix-key "\C-c"
+  "Key binding used for `ggtags-mode-prefix-map'."
+  :type 'key-sequence
+  :group 'ggtags)
+
 (defcustom ggtags-completing-read-function completing-read-function
   "Ggtags specific `completing-read-function' (which see)."
   :type 'function
   :group 'ggtags)
 
-(defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY CTAGS TIMESTAMP)
+(defvar ggtags-cache nil)         ; (ROOT TABLE DIRTY CTAGS TIMESTAMP)
 
 (defvar ggtags-current-tag-name nil)
 
@@ -231,7 +236,7 @@ Return -1 if it does not exist."
       (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
                 (error "Aborted"))
         (let ((root (read-directory-name "Directory: " nil nil t)))
-          (and (= (length root) 0) (error "No directory chosen"))
+          (and (zerop (length root)) (error "No directory chosen"))
           (when (with-temp-buffer
                   (let ((process-environment
                          (if (and (not (getenv "GTAGSLABEL"))
@@ -425,22 +430,30 @@ s: symbols              (-s)
 (defvar ggtags-current-mark nil)
 
 (defun ggtags-next-mark (&optional arg)
-  "Move to the next mark in the tag marker ring."
+  "Move to the next (newer) mark in the tag marker ring."
   (interactive)
   (or (> (ring-length find-tag-marker-ring) 1)
       (user-error "No %s mark" (if arg "previous" "next")))
   (let ((mark (or (and ggtags-current-mark
-                       (marker-buffer ggtags-current-mark)
-                       (funcall (if arg #'ring-previous #'ring-next)
+                       ;; Note `ring-previous' gets newer item.
+                       (funcall (if arg #'ring-next #'ring-previous)
                                 find-tag-marker-ring ggtags-current-mark))
-                  (progn
-                    (ring-insert find-tag-marker-ring (point-marker))
-                    (ring-ref find-tag-marker-ring 0)))))
+                  (prog1
+                      (ring-ref find-tag-marker-ring (if arg 0 -1))
+                    (ring-insert find-tag-marker-ring (point-marker))))))
+    (setq ggtags-current-mark mark)
+    (let ((i (- (ring-length find-tag-marker-ring)
+                (ring-member find-tag-marker-ring ggtags-current-mark))))
+      (message "%d%s marker" i (pcase i
+                                 (1 "st")
+                                 (2 "nd")
+                                 (3 "rd")
+                                 (_ "th"))))
     (switch-to-buffer (marker-buffer mark))
-    (goto-char mark)
-    (setq ggtags-current-mark mark)))
+    (goto-char mark)))
 
 (defun ggtags-prev-mark ()
+  "Move to the previous (older) mark in the tag marker ring."
   (interactive)
   (ggtags-next-mark 'previous))
 
@@ -597,6 +610,7 @@ s: symbols              (-s)
 (defun ggtags-navigation-mode-done ()
   (interactive)
   (ggtags-navigation-mode -1)
+  (setq ggtags-current-mark nil)
   (ggtags-navigation-mode-cleanup))
 
 (defun ggtags-navigation-mode-abort ()
@@ -672,10 +686,20 @@ s: symbols              (-s)
 (defvar ggtags-tag-overlay nil)
 (defvar ggtags-highlight-tag-timer nil)
 
+(defvar ggtags-mode-prefix-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m "p" 'ggtags-prev-mark)
+    (define-key m "n" 'ggtags-next-mark)
+    (define-key m "k" 'ggtags-kill-file-buffers)
+    (define-key m (kbd "DEL") 'ggtags-delete-tag-files)
+    (define-key m "l" 'ggtags-list-tags)
+    (define-key m "q" 'ggtags-query-replace)
+    m))
+
 (defvar ggtags-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\M-." 'ggtags-find-tag)
-    (define-key map "\C-c\M-k" 'ggtags-kill-file-buffers)
+    (define-key map ggtags-mode-prefix-key ggtags-mode-prefix-map)
     map))
 
 ;;;###autoload

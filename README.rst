@@ -1,7 +1,7 @@
 =========================
  Use GNU Global in Emacs
 =========================
- 
+
 A package for working with `GNU Global
 <http://www.gnu.org/software/global>`_ source tagging system in Emacs.
 
@@ -17,6 +17,7 @@ Features
 #. Highlight valid tag at point
 #. Built on top of ``compile.el`` (asynchonrous and other nice
    features)
+#. Support `exuberant ctags <http://ctags.sourceforge.net/>`_ backend.
 #. Support all  output formats  of ``global``:  ``grep``, ``ctags-x``,
    ``cscope`` etc.
 #. Abbreviated display of file names
@@ -46,6 +47,11 @@ Enable ``ggtags-mode`` for C/C++/Java modes::
                 (when (derived-mode-p 'c-mode 'c++-mode 'java-mode)
                   (ggtags-mode 1))))
 
+More languages/modes are supported if `GNU Global
+<http://www.gnu.org/software/global>`_ is compiled with
+``--with-exuberant-ctags`` to support `exuberant ctags
+<http://ctags.sourceforge.net/>`_.
+
 Tutorial
 ~~~~~~~~
 
@@ -67,7 +73,7 @@ which hides the auxiliary window and exits navigation mode. You can
 resume the search using ``M-,``. To abort the search press ``M-*``.
 
 Normally after a few searches a dozen buffers are created visiting
-files tracked by GNU Global. ``C-c M-k`` helps clean them up.
+files tracked by GNU Global. ``C-c k`` helps clean them up.
 
 Development
 ~~~~~~~~~~~
@@ -79,3 +85,10 @@ Bugs
 ~~~~
 
 https://github.com/leoliu/ggtags/issues
+
+known problems
+++++++++++++++
+
+When there is only one match a window is still popped up to be closed
+immediately due to a `bug <http://debbugs.gnu.org/13594>`_ in
+``compile.el``.
