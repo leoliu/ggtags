@@ -122,7 +122,7 @@ If nil, use Emacs default."
   :type 'function
   :group 'ggtags)
 
-(defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY TIMESTAMP)
+(defvar ggtags-cache nil)               ; (ROOT TABLE DIRTY CTAGS TIMESTAMP)
 
 (defvar ggtags-current-tag-name nil)
 
@@ -161,6 +161,15 @@ If nil, use Emacs default."
                 0)
             ggtags-oversize-limit)))))
 
+(defun ggtags-use-ctags-p (root)
+  "Non-nil if exuberant-ctags is used for indexing ROOT."
+  (let ((default-directory (file-name-as-directory root)))
+    ;; Check if GRTAGS contains no tags.
+    (<= (length (split-string (shell-command-to-string
+                               "gtags -d GRTAGS | head -10")
+                              "\n" t))
+        4)))
+
 (defun ggtags-get-timestamp (root)
   "Get the timestamp (float) of file GTAGS in ROOT directory.
 Return -1 if it does not exist."
@@ -174,19 +183,24 @@ Return -1 if it does not exist."
                 (regexp-quote path-separator) t))
 
 (defun ggtags-cache-get (key)
-  (assoc key ggtags-cache))
+  (assoc (file-truename key) ggtags-cache))
 
 (defun ggtags-cache-set (key val &optional dirty)
-  (let ((c (ggtags-cache-get key)))
+  (let* ((key (file-truename key))
+         (c (ggtags-cache-get key))
+         (ctags (ggtags-use-ctags-p key)))
     (if c
-        (setcdr c (list val dirty (float-time)))
-      (push (list key val dirty (float-time)) ggtags-cache))))
+        (setcdr c (list val dirty ctags (float-time)))
+      (push (list key val dirty ctags (float-time)) ggtags-cache))))
 
 (defun ggtags-cache-mark-dirty (key flag)
   "Return non-nil if operation is successful."
   (let ((cache (ggtags-cache-get key)))
     (when cache
       (setcar (cddr cache) flag))))
+
+(defun ggtags-cache-ctags-p (key)
+  (fourth (ggtags-cache-get key)))
 
 (defun ggtags-cache-dirty-p (key)
   "Value is non-nil if 'global -u' is needed."
@@ -195,7 +209,7 @@ Return -1 if it does not exist."
 (defun ggtags-cache-stale-p (key)
   "Value is non-nil if tags in cache needs to be rebuilt."
   (> (ggtags-get-timestamp key)
-     (or (fourth (ggtags-cache-get key)) 0)))
+     (or (fifth (ggtags-cache-get key)) 0)))
 
 (defvar-local ggtags-root-directory nil
   "Internal; use function `ggtags-root-directory' instead.")
@@ -219,11 +233,17 @@ Return -1 if it does not exist."
         (let ((root (read-directory-name "Directory: " nil nil t)))
           (and (= (length root) 0) (error "No directory chosen"))
           (when (with-temp-buffer
-                  (let ((default-directory
+                  (let ((process-environment
+                         (if (and (not (getenv "GTAGSLABEL"))
+                                  (yes-or-no-p "Use `ctags' backend? "))
+                             (cons "GTAGSLABEL=ctags" process-environment))
+                         process-environment)
+                        (default-directory
                           (file-name-as-directory root)))
                     (or (zerop (call-process "gtags" nil t))
                         (error "%s" (comment-string-strip
                                      (buffer-string) t t)))))
+            (ggtags-tag-names-1 root)   ; update cache
             (message "File GTAGS generated in `%s'"
                      (ggtags-root-directory)))))))
 
@@ -245,7 +265,11 @@ Return -1 if it does not exist."
                (not (ggtags-oversize-p))
                (not from-cache)
                (ggtags-cache-dirty-p root))
-      (if (zerop (call-process "global" nil nil nil "-u"))
+      (if (zerop (let ((process-environment
+                        (if (ggtags-cache-ctags-p root)
+                            (cons "GTAGSLABEL=ctags" process-environment))
+                        process-environment))
+                   (call-process "global" nil nil nil "-u")))
           (ggtags-cache-mark-dirty root nil)
         (message "ggtags: error running 'global -u'")))
     (apply 'append (mapcar (lambda (r)
@@ -288,18 +312,24 @@ r: references           (-r)
 s: symbols              (-s)
 ?: show this help\n"))
     (compilation-start
-     (if (or verbose (not buffer-file-name))
-         (format "global %s -%s \"%s\""
-                 (ggtags-global-options)
-                 (char-to-string
-                  (read-char-choice "Tag type? (d/r/s/?) " '(?d ?r ?s)))
-                 name)
+     (cond
+      (verbose
+       (format "global %s -%s \"%s\""
+               (ggtags-global-options)
+               (char-to-string
+                (read-char-choice "Tag type? (d/r/s/?) " '(?d ?r ?s)))
+               name))
+      ((ggtags-cache-ctags-p (ggtags-root-directory))
+       (format "global %s -d %s" (ggtags-global-options) name))
+      ((not buffer-file-name)
+       (ggtags-find-tag name t))
+      (t
        (format "global %s --from-here=%d:%s \"%s\""
                (ggtags-global-options)
                (line-number-at-pos)
                (shell-quote-argument
                 (expand-file-name (file-truename buffer-file-name)))
-               name))
+               name)))
      'ggtags-global-mode))
   (eval-and-compile (require 'etags))
   (ring-insert find-tag-marker-ring (point-marker))
@@ -631,9 +661,13 @@ s: symbols              (-s)
       ;; When oversize update on a per-save basis.
       (when (and buffer-file-name (ggtags-oversize-p))
         (with-demoted-errors
-          (call-process "global" nil 0 nil
-                        "--single-update"
-                        (file-truename buffer-file-name)))))))
+          (let ((process-environment
+                 (if (ggtags-cache-ctags-p root)
+                     (cons "GTAGSLABEL=ctags" process-environment))
+                 process-environment))
+            (call-process "global" nil 0 nil
+                          "--single-update"
+                          (file-truename buffer-file-name))))))))
 
 (defvar ggtags-tag-overlay nil)
 (defvar ggtags-highlight-tag-timer nil)
