@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.6.7
+;; Version: 0.6.8
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -131,6 +131,8 @@ properly update `ggtags-mode-map'."
   :type 'function
   :group 'ggtags)
 
+(defvar ggtags-bug-url "https://github.com/leoliu/ggtags/issues")
+
 (defvar ggtags-cache nil)         ; (ROOT TABLE DIRTY CTAGS TIMESTAMP)
 
 (defvar ggtags-current-tag-name nil)
@@ -256,6 +258,25 @@ Return -1 if it does not exist."
             (message "File GTAGS generated in `%s'"
                      (ggtags-root-directory)))))))
 
+(defun ggtags-update-tags (&optional single-update noerror)
+  "Update GNU Global tag database."
+  (interactive)
+  (let ((process-environment
+         (if (ggtags-cache-ctags-p (ggtags-root-directory))
+             (cons "GTAGSLABEL=ctags" process-environment))
+         process-environment))
+    (if single-update
+        (when buffer-file-name
+          (or (zerop (call-process "global" nil 0 nil "--single-update"
+                                   (file-truename buffer-file-name)))
+              (funcall (if noerror 'message 'error)
+                       "Failed to run global --single-update")))
+      (with-temp-buffer
+        (or (zerop (call-process "global" nil t nil "-u"))
+            (funcall (if noerror 'message 'error)
+                     "Process global exited abnormally: %s"
+                     (buffer-string)))))))
+
 (defun ggtags-tag-names-1 (root &optional from-cache)
   (when root
     (if (and (not from-cache) (ggtags-cache-stale-p root))
@@ -274,13 +295,7 @@ Return -1 if it does not exist."
                (not (ggtags-oversize-p))
                (not from-cache)
                (ggtags-cache-dirty-p root))
-      (if (zerop (let ((process-environment
-                        (if (ggtags-cache-ctags-p root)
-                            (cons "GTAGSLABEL=ctags" process-environment))
-                        process-environment))
-                   (call-process "global" nil nil nil "-u")))
-          (ggtags-cache-mark-dirty root nil)
-        (message "ggtags: error running 'global -u'")))
+      (ggtags-update-tags))
     (apply 'append (mapcar (lambda (r)
                              (ggtags-tag-names-1 r from-cache))
                            (cons root (ggtags-get-libpath))))))
@@ -575,7 +590,10 @@ s: symbols              (-s)
   (add-hook 'compilation-finish-functions 'ggtags-handle-single-match nil t)
   (define-key ggtags-global-mode-map "o" 'visible-mode))
 
-(defvar ggtags-navigation-mode-map
+;; NOTE: Need this to avoid putting menu items in
+;; `emulation-mode-map-alists', which creates double entries. See
+;; http://i.imgur.com/VJJTzVc.png
+(defvar ggtags-navigation-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\M-n" 'next-error)
     (define-key map "\M-p" 'previous-error)
@@ -587,6 +605,32 @@ s: symbols              (-s)
     ;; Intercept M-. and M-* keys
     (define-key map [remap pop-tag-mark] 'ggtags-navigation-mode-abort)
     (define-key map [remap ggtags-find-tag] 'undefined)
+    map))
+
+(defvar ggtags-navigation-mode-map
+  (let ((map (make-sparse-keymap))
+        (menu (make-sparse-keymap "GG-Navigation")))
+    (set-keymap-parent map ggtags-navigation-map)
+    ;; Menu items: (info "(elisp)Extended Menu Items")
+    (define-key map [menu-bar ggtags-navigation] (cons "GG-Navigation" menu))
+    ;; Ordered backwards
+    (define-key menu [visible-mode]
+      '(menu-item "Visible mode" ggtags-navigation-visible-mode
+                  :button (:toggle . (ignore-errors
+                                       (ggtags-ensure-global-buffer
+                                         visible-mode)))))
+    (define-key menu [done]
+      '(menu-item "Finish navigation" ggtags-navigation-mode-done))
+    (define-key menu [abort]
+      '(menu-item "Abort" ggtags-navigation-mode-abort))
+    (define-key menu [previous-file]
+      '(menu-item "Previous file" ggtags-navigation-previous-file))
+    (define-key menu [next-file]
+      '(menu-item "Next file" ggtags-navigation-next-file))
+    (define-key menu [previous]
+      '(menu-item "Previous match" previous-error))
+    (define-key menu [next]
+      '(menu-item "Next match" next-error))
     map))
 
 (defun ggtags-move-to-tag (&optional name)
@@ -679,14 +723,7 @@ s: symbols              (-s)
       (ggtags-cache-mark-dirty root t)
       ;; When oversize update on a per-save basis.
       (when (and buffer-file-name (ggtags-oversize-p))
-        (with-demoted-errors
-          (let ((process-environment
-                 (if (ggtags-cache-ctags-p root)
-                     (cons "GTAGSLABEL=ctags" process-environment))
-                 process-environment))
-            (call-process "global" nil 0 nil
-                          "--single-update"
-                          (file-truename buffer-file-name))))))))
+        (ggtags-update-tags t t)))))
 
 (defvar ggtags-tag-overlay nil)
 (defvar ggtags-highlight-tag-timer nil)
@@ -702,9 +739,45 @@ s: symbols              (-s)
     m))
 
 (defvar ggtags-mode-map
-  (let ((map (make-sparse-keymap)))
+  (let ((map (make-sparse-keymap))
+        (menu (make-sparse-keymap "Ggtags")))
     (define-key map "\M-." 'ggtags-find-tag)
     (define-key map ggtags-mode-prefix-key ggtags-mode-prefix-map)
+    ;; Menu items
+    (define-key map [menu-bar ggtags] (cons "Ggtags" menu))
+    ;; Ordered backwards
+    (define-key menu [report-bugs]
+      `(menu-item "Report bugs"
+                  (lambda () (interactive)
+                    (browse-url ggtags-bug-url)
+                    (message "Please visit %s" ggtags-bug-url))
+                  :help ,(format "Visit %s" ggtags-bug-url)))
+    (define-key menu [custom-ggtags]
+      '(menu-item "Customize Ggtags"
+                  (lambda () (interactive) (customize-group 'ggtags))))
+    (define-key menu [sep2] menu-bar-separator)
+    (define-key menu [delete-tags]
+      '(menu-item "Delete tag files" ggtags-delete-tag-files
+                  :enable (ggtags-root-directory)))
+    (define-key menu [next-mark]
+      '(menu-item "Next mark" ggtags-next-mark))
+    (define-key menu [prev-mark]
+      '(menu-item "Previous mark" ggtags-prev-mark))
+    (define-key menu [sep1] menu-bar-separator)
+    (define-key menu [query-replace]
+      '(menu-item "Query replace" ggtags-query-replace))
+    (define-key menu [list-tags]
+      '(menu-item "List tags" ggtags-list-tags))
+    (define-key menu [find-tag-resume]
+      '(menu-item "Resume find tag" tags-loop-continue))
+    (define-key menu [find-tag]
+      '(menu-item "Find tag" ggtags-find-tag))
+    (define-key menu [run-gtags]
+      '(menu-item (if (ggtags-root-directory) "Update tag files" "Run gtags")
+                  (lambda () (interactive)
+                    (if (ggtags-root-directory)
+                        (ggtags-update-tags)
+                      (ggtags-ensure-root-directory)))))
     map))
 
 (defun ggtags-mode-update-prefix-key (symbol value)
@@ -815,7 +888,7 @@ s: symbols              (-s)
 ;; Higher priority for `ggtags-navigation-mode' to avoid being
 ;; hijacked by modes such as `view-mode'.
 (defvar ggtags-mode-map-alist
-  `((ggtags-navigation-mode . ,ggtags-navigation-mode-map)))
+  `((ggtags-navigation-mode . ,ggtags-navigation-map)))
 
 (add-to-list 'emulation-mode-map-alists 'ggtags-mode-map-alist)
 
