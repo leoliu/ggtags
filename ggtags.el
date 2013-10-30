@@ -53,9 +53,6 @@
 (eval-when-compile (require 'cl))
 (require 'compile)
 
-(if (not (fboundp 'comment-string-strip))
-    (autoload 'comment-string-strip "newcomment"))
-
 (eval-when-compile
   (unless (fboundp 'setq-local)
     (defmacro setq-local (var val)
@@ -68,8 +65,11 @@
             (list 'make-variable-buffer-local (list 'quote var))))))
 
 (eval-and-compile
-  (unless (fboundp 'user-error)
-    (defalias 'user-error 'error)))
+  (or (fboundp 'user-error)
+      (defalias 'user-error 'error))
+  ;; File newcomment.el is preloaded since 24.3.
+  (or (fboundp 'comment-string-strip)
+      (autoload 'comment-string-strip "newcomment")))
 
 (defgroup ggtags nil
   "GNU Global source code tagging system."
@@ -118,7 +118,11 @@ If nil, use Emacs default."
   :group 'ggtags)
 
 (defcustom ggtags-mode-prefix-key "\C-c"
-  "Key binding used for `ggtags-mode-prefix-map'."
+  "Key binding used for `ggtags-mode-prefix-map'.
+Users should change the value using `customize-variable' to
+properly update `ggtags-mode-map'."
+  ;; Set later or initialisation will fail.
+  ;; :set 'ggtags-mode-update-prefix-key
   :type 'key-sequence
   :group 'ggtags)
 
@@ -443,7 +447,8 @@ s: symbols              (-s)
                     (ring-insert find-tag-marker-ring (point-marker))))))
     (setq ggtags-current-mark mark)
     (let ((i (- (ring-length find-tag-marker-ring)
-                (ring-member find-tag-marker-ring ggtags-current-mark))))
+                (ring-member find-tag-marker-ring ggtags-current-mark)))
+          (message-log-max nil))
       (message "%d%s marker" i (pcase i
                                  (1 "st")
                                  (2 "nd")
@@ -701,6 +706,17 @@ s: symbols              (-s)
     (define-key map "\M-." 'ggtags-find-tag)
     (define-key map ggtags-mode-prefix-key ggtags-mode-prefix-map)
     map))
+
+(defun ggtags-mode-update-prefix-key (symbol value)
+  (let ((old (and (boundp symbol) (symbol-value symbol))))
+    (and old (define-key ggtags-mode-map old nil)))
+  (when value
+    (define-key ggtags-mode-map value ggtags-mode-prefix-map))
+  (set-default symbol value))
+
+;; Set here to avoid initialisation problem for
+;; `ggtags-mode-prefix-key'.
+(put 'ggtags-mode-prefix-key 'custom-set #'ggtags-mode-update-prefix-key)
 
 ;;;###autoload
 (define-minor-mode ggtags-mode nil
