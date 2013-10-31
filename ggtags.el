@@ -328,15 +328,20 @@ Return -1 if it does not exist."
                     args)))
     (mapconcat 'identity (delq nil xs) " ")))
 
+(defvar ggtags-global-start-marker nil)
+
+(defun ggtags-global-save-start-marker ()
+  (when (markerp ggtags-global-start-marker)
+    (eval-and-compile (require 'etags))
+    (ring-insert find-tag-marker-ring ggtags-global-start-marker)
+    (setq ggtags-global-start-marker nil)))
+
 (defun ggtags-global-start (command &optional root)
   (let ((default-directory (or root (ggtags-root-directory)))
         (split-window-preferred-function ggtags-split-window-function))
-    (prog1 (compilation-start command 'ggtags-global-mode)
-      (eval-and-compile (require 'etags))
-      (ring-insert find-tag-marker-ring (point-marker))
-      (setq tags-loop-scan t
-            tags-loop-operate '(ggtags-find-tag-resume))
-      (ggtags-navigation-mode +1))))
+    (setq ggtags-global-start-marker (point-marker))
+    (ggtags-navigation-mode +1)
+    (compilation-start command 'ggtags-global-mode)))
 
 (defun ggtags-find-tag-resume ()
   (interactive)
@@ -650,6 +655,8 @@ s: symbol              (-s)
       (goto-char orig))))
 
 (defun ggtags-navigation-mode-cleanup (&optional buf time)
+  ;; Clear the marker in case of zero matches.
+  (setq ggtags-global-start-marker nil)
   (let ((buf (or buf compilation-last-buffer)))
     (and (buffer-live-p buf)
          (with-current-buffer buf
@@ -664,6 +671,8 @@ s: symbol              (-s)
   (interactive)
   (ggtags-navigation-mode -1)
   (setq ggtags-current-mark nil)
+  (setq tags-loop-scan t
+        tags-loop-operate '(ggtags-find-tag-resume))
   (ggtags-navigation-mode-cleanup))
 
 (defun ggtags-navigation-mode-abort ()
@@ -707,7 +716,9 @@ s: symbol              (-s)
   (if ggtags-navigation-mode
       (progn
         (add-hook 'next-error-hook 'ggtags-move-to-tag)
+        (add-hook 'next-error-hook 'ggtags-global-save-start-marker)
         (add-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function))
+    (remove-hook 'next-error-hook 'ggtags-global-save-start-marker)
     (remove-hook 'next-error-hook 'ggtags-move-to-tag)
     (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function)))
 
