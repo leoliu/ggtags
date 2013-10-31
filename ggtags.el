@@ -383,19 +383,30 @@ If point is at a definition tag, find references, and vice versa."
   (interactive (list (ggtags-read-tag)))
   (ggtags-find-tag 'symbol name))
 
+(defun ggtags-read-string (prompt)
+  (ggtags-ensure-root-directory)
+  (let ((prompt (if (string-match ": *\\'" prompt)
+                    (substring prompt 0 (match-beginning 0))
+                  prompt))
+        (default (thing-at-point 'symbol)))
+    (read-string (format (if default "%s (default `%s'): "
+                           "%s: ")
+                         prompt default)
+                 nil nil (and default (substring-no-properties default)))))
+
 (defun ggtags-grep (pattern)
-  (interactive (list (read-string "Grep pattern: ")))
+  (interactive (list (ggtags-read-string "Grep pattern")))
   (ggtags-find-tag 'grep pattern))
 
 (defun ggtags-idutils-query (pattern)
-  (interactive (list (read-string "ID query pattern: ")))
+  (interactive (list (ggtags-read-string "ID query pattern")))
   (ggtags-find-tag 'idutils pattern))
 
 ;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
 (defun ggtags-find-tag-regexp (regexp file-or-directory)
   "List all tags matching REGEXP in FILE-OR-DIRECTORY."
   (interactive
-   (list (read-string "POSIX regexp: ")
+   (list (ggtags-read-string "POSIX regexp")
          (if current-prefix-arg
              (read-file-name "File or directory: " nil buffer-file-name t)
            (ggtags-root-directory))))
