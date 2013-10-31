@@ -311,23 +311,21 @@ Return -1 if it does not exist."
              (ggtags-tag-names)
              nil t nil nil default)))))
 
-(defun ggtags-global-build-command (fmt cmd &rest args)
-  ;; FMT if nil takes the value of ggtags-global-output-format
+(defun ggtags-global-build-command (cmd &rest args)
   ;; CMD can be definition, reference, symbol, grep, idutils
-  (let* ((fmt (format "--result=%s"
-                      (or fmt ggtags-global-output-format)))
-         (xs (append (list "global" "-v" fmt
-                           (and ggtags-global-has-color "--color")
-                           (and ggtags-global-has-path-style
-                                "--path-style=shorter")
-                           (pcase cmd
-                             ((pred stringp) cmd)
-                             (`definition "-d")
-                             (`reference "-r")
-                             (`symbol "-s")
-                             (`grep "--grep")
-                             (`idutils "--idutils")))
-                     args)))
+  (let ((xs (append (list "global" "-v"
+                          (format "--result=%s" ggtags-global-output-format)
+                          (and ggtags-global-has-color "--color")
+                          (and ggtags-global-has-path-style
+                               "--path-style=shorter")
+                          (pcase cmd
+                            ((pred stringp) cmd)
+                            (`definition "-d")
+                            (`reference "-r")
+                            (`symbol "-s")
+                            (`grep "--grep")
+                            (`idutils "--idutils")))
+                    args)))
     (mapconcat 'identity (delq nil xs) " ")))
 
 (defun ggtags-global-start (command &optional root)
@@ -377,7 +375,7 @@ s: symbol              (-s)
                                (expand-file-name
                                 (file-truename buffer-file-name))))))))
     (when cmd
-      (ggtags-global-start (ggtags-global-build-command nil cmd name)))))
+      (ggtags-global-start (ggtags-global-build-command cmd name)))))
 
 ;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
 (defun ggtags-find-tag-regexp (regexp file-or-directory)
