@@ -238,7 +238,8 @@ Return -1 if it does not exist."
 (defun ggtags-root-directory ()
   (or ggtags-root-directory
       (setq ggtags-root-directory
-            (ignore-errors (ggtags-process-string "global" "-pr")))))
+            (ignore-errors (file-name-as-directory
+                            (ggtags-process-string "global" "-pr"))))))
 
 (defun ggtags-check-root-directory ()
   (or (ggtags-root-directory) (error "File GTAGS not found")))
@@ -297,10 +298,12 @@ Return -1 if it does not exist."
 
 (defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
-  (let ((default (substring-no-properties (or (thing-at-point 'symbol) "")))
+  (let ((default (thing-at-point 'symbol))
         (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
-          (if quick (or default (user-error "No tag at point"))
+          (if quick (if default
+                        (substring-no-properties default)
+                      (user-error "No tag at point"))
             (completing-read
              (format (if default "Tag (default %s): " "Tag: ") default)
              ;; XXX: build tag names more lazily such as using
@@ -308,11 +311,41 @@ Return -1 if it does not exist."
              (ggtags-tag-names)
              nil t nil nil default)))))
 
-(defun ggtags-global-options ()
-  (concat "-v --result="
-          (symbol-name ggtags-global-output-format)
-          (and ggtags-global-has-color " --color")
-          (and ggtags-global-has-path-style " --path-style=shorter")))
+(defun ggtags-global-build-command (fmt cmd &rest args)
+  ;; FMT if nil takes the value of ggtags-global-output-format
+  ;; CMD can be definition, reference, symbol, grep, idutils
+  (let* ((fmt (format "--result=%s"
+                      (or fmt ggtags-global-output-format)))
+         (xs (append (list "global" "-v" fmt
+                           (and ggtags-global-has-color "--color")
+                           (and ggtags-global-has-path-style
+                                "--path-style=shorter")
+                           (pcase cmd
+                             ((pred stringp) cmd)
+                             (`definition "-d")
+                             (`reference "-r")
+                             (`symbol "-s")
+                             (`grep "--grep")
+                             (`idutils "--idutils")))
+                     args)))
+    (mapconcat 'identity (delq nil xs) " ")))
+
+(defun ggtags-global-start (command &optional root)
+  (let ((default-directory (or root (ggtags-root-directory)))
+        (split-window-preferred-function ggtags-split-window-function))
+    (prog1 (compilation-start command 'ggtags-global-mode)
+      (eval-and-compile (require 'etags))
+      (ring-insert find-tag-marker-ring (point-marker))
+      (setq tags-loop-scan t
+            tags-loop-operate '(ggtags-find-tag-resume))
+      (ggtags-navigation-mode +1))))
+
+(defun ggtags-find-tag-resume ()
+  (interactive)
+  (ggtags-ensure-global-buffer
+    (ggtags-navigation-mode +1)
+    (let ((split-window-preferred-function ggtags-split-window-function))
+      (compile-goto-error))))
 
 ;;;###autoload
 (defun ggtags-find-tag (name &optional verbose)
@@ -322,76 +355,49 @@ When called with prefix, ask the name and kind of tag."
   (interactive (list (ggtags-read-tag (not current-prefix-arg))
                      current-prefix-arg))
   (ggtags-check-root-directory)
-  (let ((split-window-preferred-function ggtags-split-window-function)
-        (default-directory (ggtags-root-directory))
-        (help-char ??)
+  (when (equal name "")
+    (user-error "No tag"))
+  (let ((help-char ??)
         (help-form "\
-d: definitions          (-d)
-r: references           (-r)
-s: symbols              (-s)
-?: show this help\n"))
-    (compilation-start
-     (cond
-      (verbose
-       (format "global %s -%s \"%s\""
-               (ggtags-global-options)
-               (char-to-string
-                (read-char-choice "Tag type? (d/r/s/?) " '(?d ?r ?s)))
-               name))
-      ((ggtags-cache-ctags-p (ggtags-root-directory))
-       (format "global %s -d %s" (ggtags-global-options) name))
-      ((not buffer-file-name)
-       (ggtags-find-tag name t))
-      (t
-       (format "global %s --from-here=%d:%s \"%s\""
-               (ggtags-global-options)
-               (line-number-at-pos)
-               (shell-quote-argument
-                (expand-file-name (file-truename buffer-file-name)))
-               name)))
-     'ggtags-global-mode))
-  (eval-and-compile (require 'etags))
-  (ring-insert find-tag-marker-ring (point-marker))
-  (setq tags-loop-scan t
-        tags-loop-operate '(ggtags-find-tag-resume))
-  (ggtags-navigation-mode +1))
-
-(defun ggtags-find-tag-resume ()
-  (interactive)
-  (ggtags-ensure-global-buffer
-    (ggtags-navigation-mode +1)
-    (let ((split-window-preferred-function ggtags-split-window-function))
-      (compile-goto-error))))
+d: definition          (-d)
+r: reference           (-r)
+s: symbol              (-s)
+?: show this help\n")
+        (cmd (cond (verbose
+                    (format "-%c" (read-char-choice
+                                   "Tag type? (d/r/s/?) " '(?d ?r ?s))))
+                   ((ggtags-cache-ctags-p (ggtags-root-directory))
+                    "-d")
+                   ((not buffer-file-name)
+                    (ggtags-find-tag name t)
+                    nil)
+                   (t (format "--from-here=%d:%s"
+                              (line-number-at-pos)
+                              (shell-quote-argument
+                               (expand-file-name
+                                (file-truename buffer-file-name))))))))
+    (when cmd
+      (ggtags-global-start (ggtags-global-build-command nil cmd name)))))
 
 ;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
-(defun ggtags-list-tags (regexp file-or-directory)
+(defun ggtags-find-tag-regexp (regexp file-or-directory)
   "List all tags matching REGEXP in FILE-OR-DIRECTORY."
-  (interactive (list (read-string "POSIX regexp: ")
-                     (read-file-name "Directory: "
-                                     (if current-prefix-arg
-                                         (ggtags-root-directory)
-                                       default-directory)
-                                     buffer-file-name t)))
-  (let ((split-window-preferred-function ggtags-split-window-function)
-        (default-directory (if (file-directory-p file-or-directory)
-                               (file-name-as-directory file-or-directory)
-                             (file-name-directory file-or-directory))))
-    (ggtags-check-root-directory)
-    (eval-and-compile (require 'etags))
-    (ggtags-navigation-mode +1)
-    (ring-insert find-tag-marker-ring (point-marker))
-    (with-current-buffer
-        (compilation-start (format "global %s -e %s %s"
-                                   (ggtags-global-options)
-                                   regexp
-                                   (if (file-directory-p file-or-directory)
-                                       "-l ."
-                                     (concat "-f " (shell-quote-argument
-                                                    (file-name-nondirectory
-                                                     file-or-directory)))))
-                           'ggtags-global-mode)
-      (setq-local compilation-auto-jump-to-first-error nil)
-      (remove-hook 'compilation-finish-functions 'ggtags-handle-single-match t))))
+  (interactive
+   (list (read-string "POSIX regexp: ")
+         (if current-prefix-arg
+             (read-file-name "File or directory: " nil buffer-file-name t)
+           (ggtags-root-directory))))
+  (ggtags-check-root-directory)
+  (let* ((root (if (file-directory-p file-or-directory)
+                   (file-name-as-directory file-or-directory)
+                 (file-name-directory file-or-directory)))
+         (cmd (ggtags-global-build-command
+               nil nil "-e" regexp
+               (if (file-directory-p file-or-directory)
+                   "-l ."
+                 (concat "-f " (shell-quote-argument
+                                (file-name-nondirectory file-or-directory)))))))
+    (ggtags-global-start cmd root)))
 
 (defun ggtags-query-replace (from to &optional delimited directory)
   "Query replace FROM with TO on all files in DIRECTORY."
@@ -748,7 +754,6 @@ s: symbols              (-s)
     (define-key m "\M-p" 'ggtags-prev-mark)
     (define-key m "\M-n" 'ggtags-next-mark)
     (define-key m "\M-k" 'ggtags-kill-file-buffers)
-    (define-key m "\M-l" 'ggtags-list-tags)
     (define-key m (kbd "M-%") 'ggtags-query-replace)
     m))
 
@@ -756,6 +761,7 @@ s: symbols              (-s)
   (let ((map (make-sparse-keymap))
         (menu (make-sparse-keymap "Ggtags")))
     (define-key map "\M-." 'ggtags-find-tag)
+    (define-key map (kbd "C-M-.") 'ggtags-find-tag-regexp)
     (define-key map ggtags-mode-prefix-key ggtags-mode-prefix-map)
     ;; Menu items
     (define-key map [menu-bar ggtags] (cons "Ggtags" menu))
@@ -780,8 +786,8 @@ s: symbols              (-s)
     (define-key menu [sep1] menu-bar-separator)
     (define-key menu [query-replace]
       '(menu-item "Query replace" ggtags-query-replace))
-    (define-key menu [list-tags]
-      '(menu-item "List tags" ggtags-list-tags))
+    (define-key menu [find-tag-regexp]
+      '(menu-item "Find tag matching regexp" ggtags-find-tag-regexp))
     (define-key menu [find-tag-resume]
       '(menu-item "Resume find tag" tags-loop-continue))
     (define-key menu [find-tag]
