@@ -66,10 +66,7 @@
 
 (eval-and-compile
   (or (fboundp 'user-error)
-      (defalias 'user-error 'error))
-  ;; File newcomment.el is preloaded since 24.3.
-  (or (fboundp 'comment-string-strip)
-      (autoload 'comment-string-strip "newcomment")))
+      (defalias 'user-error 'error)))
 
 (defgroup ggtags nil
   "GNU Global source code tagging system."
@@ -145,14 +142,14 @@ properly update `ggtags-mode-map'."
 ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
 (defvar ggtags-global-has-path-style    ; introduced in global 6.2.8
   (with-demoted-errors                  ; in case `global' not found
-    (zerop (call-process "global" nil nil nil
+    (zerop (process-file "global" nil nil nil
                          "--path-style" "shorter" "--help")))
   "Non-nil if `global' supports --path-style switch.")
 
 ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
 (defvar ggtags-global-has-color         ; introduced in global 6.2.9
   (with-demoted-errors
-    (zerop (call-process "global" nil nil nil "--color" "--help"))))
+    (zerop (process-file "global" nil nil nil "--color" "--help"))))
 
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
@@ -223,6 +220,17 @@ Return -1 if it does not exist."
   (> (ggtags-get-timestamp key)
      (or (fifth (ggtags-cache-get key)) 0)))
 
+(defun ggtags-process-string (program &rest args)
+  (with-temp-buffer
+    (let ((exit (apply #'process-file program nil t nil args))
+          (output (progn
+                    (goto-char (point-max))
+                    (skip-chars-backward " \t\n")
+                    (buffer-substring (point-min) (point)))))
+      (or (zerop exit)
+          (error "`%s' non-zero exit: %s" program output))
+      output)))
+
 (defvar-local ggtags-root-directory nil
   "Internal; use function `ggtags-root-directory' instead.")
 
@@ -230,10 +238,7 @@ Return -1 if it does not exist."
 (defun ggtags-root-directory ()
   (or ggtags-root-directory
       (setq ggtags-root-directory
-            (with-temp-buffer
-              (when (zerop (call-process "global" nil (list t nil) nil "-pr"))
-                (file-name-as-directory
-                 (comment-string-strip (buffer-string) t t)))))))
+            (ignore-errors (ggtags-process-string "global" "-pr")))))
 
 (defun ggtags-check-root-directory ()
   (or (ggtags-root-directory) (error "File GTAGS not found")))
@@ -244,22 +249,17 @@ Return -1 if it does not exist."
                 (error "Aborted"))
         (let ((root (read-directory-name "Directory: " nil nil t)))
           (and (zerop (length root)) (error "No directory chosen"))
-          (when (with-temp-buffer
-                  (let ((process-environment
-                         (if (and (not (getenv "GTAGSLABEL"))
-                                  (yes-or-no-p "Use `ctags' backend? "))
-                             (cons "GTAGSLABEL=ctags" process-environment))
-                         process-environment)
-                        (default-directory
-                          (file-name-as-directory root)))
-                    (or (zerop (call-process "gtags" nil t))
-                        (error "%s" (comment-string-strip
-                                     (buffer-string) t t)))))
+          (when (let ((process-environment
+                       (if (and (not (getenv "GTAGSLABEL"))
+                                (yes-or-no-p "Use `ctags' backend? "))
+                           (cons "GTAGSLABEL=ctags" process-environment))
+                       process-environment)
+                      (default-directory (file-name-as-directory root)))
+                  (and (ggtags-process-string "gtags") t))
             (ggtags-tag-names-1 root)   ; update cache
-            (message "File GTAGS generated in `%s'"
-                     (ggtags-root-directory)))))))
+            (message "GTAGS generated in `%s'" (ggtags-root-directory)))))))
 
-(defun ggtags-update-tags (&optional single-update noerror)
+(defun ggtags-update-tags (&optional single-update)
   "Update GNU Global tag database."
   (interactive)
   (let ((process-environment
@@ -268,15 +268,9 @@ Return -1 if it does not exist."
          process-environment))
     (if single-update
         (when buffer-file-name
-          (or (zerop (call-process "global" nil 0 nil "--single-update"
-                                   (file-truename buffer-file-name)))
-              (funcall (if noerror 'message 'error)
-                       "Failed to run global --single-update")))
-      (with-temp-buffer
-        (or (zerop (call-process "global" nil t nil "-u"))
-            (funcall (if noerror 'message 'error)
-                     "Process global exited abnormally: %s"
-                     (buffer-string)))))))
+          (process-file "global" nil 0 nil "--single-update"
+                        (file-truename buffer-file-name)))
+      (ggtags-process-string "global" "-u"))))
 
 (defun ggtags-tag-names-1 (root &optional from-cache)
   (when root
@@ -743,7 +737,7 @@ s: symbols              (-s)
       (ggtags-cache-mark-dirty root t)
       ;; When oversize update on a per-save basis.
       (when (and buffer-file-name (ggtags-oversize-p))
-        (ggtags-update-tags t t)))))
+        (ggtags-update-tags 'single-update)))))
 
 (defvar ggtags-tag-overlay nil)
 (defvar ggtags-highlight-tag-timer nil)
@@ -864,7 +858,7 @@ s: symbols              (-s)
     (let ((file (file-truename buffer-file-name)))
       (with-temp-buffer
         (when (with-demoted-errors
-                (zerop (call-process "global" nil t nil "-f" file)))
+                (zerop (process-file "global" nil t nil "-f" file)))
           (goto-char (point-min))
           (loop while (re-search-forward
                        "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
