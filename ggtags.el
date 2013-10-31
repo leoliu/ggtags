@@ -34,8 +34,7 @@
 ;;
 ;; `M-.' finds definition or references according to the context at
 ;; point, i.e. if point is at a definition tag find references and
-;; vice versa. `C-u M-.' is verbose and will ask you the name - with
-;; completion - and the type of tag to search.
+;; vice versa. `M-]' finds references.
 ;;
 ;; If multiple matches are found, navigation mode is entered. In this
 ;; mode, `M-n' and `M-p' moves to next and previous match, `M-}' and
@@ -104,6 +103,11 @@ If an integer abbreviate only names longer than that number."
 (defcustom ggtags-split-window-function split-window-preferred-function
   "A function to control how ggtags pops up the auxiliary window."
   :type 'function
+  :group 'ggtags)
+
+(defcustom ggtags-use-idutils (and (executable-find "mkid") t)
+  "Non-nil to also generate the idutils DB."
+  :type 'boolean
   :group 'ggtags)
 
 (defcustom ggtags-global-output-format 'grep
@@ -256,7 +260,9 @@ Return -1 if it does not exist."
                            (cons "GTAGSLABEL=ctags" process-environment))
                        process-environment)
                       (default-directory (file-name-as-directory root)))
-                  (and (ggtags-process-string "gtags") t))
+                  (and (apply #'ggtags-process-string
+                              "gtags" (and ggtags-use-idutils '("--idutils")))
+                       t))
             (ggtags-tag-names-1 root)   ; update cache
             (message "GTAGS generated in `%s'" (ggtags-root-directory)))))))
 
@@ -296,20 +302,20 @@ Return -1 if it does not exist."
                              (ggtags-tag-names-1 r from-cache))
                            (cons root (ggtags-get-libpath))))))
 
-(defun ggtags-read-tag (quick)
+(defun ggtags-read-tag ()
   (ggtags-ensure-root-directory)
   (let ((default (thing-at-point 'symbol))
         (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
-          (if quick (if default
-                        (substring-no-properties default)
-                      (user-error "No tag at point"))
-            (completing-read
-             (format (if default "Tag (default %s): " "Tag: ") default)
-             ;; XXX: build tag names more lazily such as using
-             ;; `completion-table-dynamic'.
-             (ggtags-tag-names)
-             nil t nil nil default)))))
+          (cond (current-prefix-arg
+                 (completing-read
+                  (format (if default "Tag (default %s): " "Tag: ") default)
+                  ;; XXX: build tag names more lazily such as using
+                  ;; `completion-table-dynamic'.
+                  (ggtags-tag-names) nil t nil nil default))
+                ((not default)
+                 (user-error "No tag at point"))
+                (t (substring-no-properties default))))))
 
 (defun ggtags-global-build-command (cmd &rest args)
   ;; CMD can be definition, reference, symbol, grep, idutils
@@ -350,37 +356,40 @@ Return -1 if it does not exist."
     (let ((split-window-preferred-function ggtags-split-window-function))
       (compile-goto-error))))
 
-;;;###autoload
-(defun ggtags-find-tag (name &optional verbose)
-  "Find definitions or references to tag NAME by context.
-If point is at a definition tag, find references, and vice versa.
-When called with prefix, ask the name and kind of tag."
-  (interactive (list (ggtags-read-tag (not current-prefix-arg))
-                     current-prefix-arg))
+(defun ggtags-find-tag (cmd name)
   (ggtags-check-root-directory)
-  (when (equal name "")
-    (user-error "No tag"))
-  (let ((help-char ??)
-        (help-form "\
-d: definition          (-d)
-r: reference           (-r)
-s: symbol              (-s)
-?: show this help\n")
-        (cmd (cond (verbose
-                    (format "-%c" (read-char-choice
-                                   "Tag type? (d/r/s/?) " '(?d ?r ?s))))
-                   ((ggtags-cache-ctags-p (ggtags-root-directory))
-                    "-d")
-                   ((not buffer-file-name)
-                    (ggtags-find-tag name t)
-                    nil)
-                   (t (format "--from-here=%d:%s"
-                              (line-number-at-pos)
-                              (shell-quote-argument
-                               (expand-file-name
-                                (file-truename buffer-file-name))))))))
-    (when cmd
-      (ggtags-global-start (ggtags-global-build-command cmd name)))))
+  (ggtags-global-start (ggtags-global-build-command cmd name)))
+
+;;;###autoload
+(defun ggtags-find-tag-dwim (name)
+  "Find definitions or references of tag NAME by context.
+If point is at a definition tag, find references, and vice versa."
+  (interactive (list (ggtags-read-tag)))
+  (if (or (ggtags-cache-ctags-p (ggtags-root-directory))
+          (not buffer-file-name))
+      (ggtags-find-tag 'definition name)
+    (ggtags-find-tag (format "--from-here=%d:%s"
+                             (line-number-at-pos)
+                             (shell-quote-argument
+                              (file-truename buffer-file-name)))
+                     name)))
+
+(defun ggtags-find-reference (name)
+  (interactive (list (ggtags-read-tag)))
+  (ggtags-find-tag 'reference name))
+
+(defun ggtags-find-other-symbol (name)
+  ;; Other than definition or reference
+  (interactive (list (ggtags-read-tag)))
+  (ggtags-find-tag 'symbol name))
+
+(defun ggtags-grep (pattern)
+  (interactive (list (read-string "Grep pattern: ")))
+  (ggtags-find-tag 'grep pattern))
+
+(defun ggtags-idutils-query (pattern)
+  (interactive (list (read-string "ID query pattern: ")))
+  (ggtags-find-tag 'idutils pattern))
 
 ;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
 (defun ggtags-find-tag-regexp (regexp file-or-directory)
@@ -762,6 +771,9 @@ s: symbol              (-s)
     (define-key m (kbd "M-DEL") 'ggtags-delete-tag-files)
     (define-key m "\M-p" 'ggtags-prev-mark)
     (define-key m "\M-n" 'ggtags-next-mark)
+    (define-key m "\M-s" 'ggtags-find-other-symbol)
+    (define-key m "\M-g" 'ggtags-grep)
+    (define-key m "\M-i" 'ggtags-idutils-query)
     (define-key m "\M-k" 'ggtags-kill-file-buffers)
     (define-key m (kbd "M-%") 'ggtags-query-replace)
     m))
@@ -769,7 +781,8 @@ s: symbol              (-s)
 (defvar ggtags-mode-map
   (let ((map (make-sparse-keymap))
         (menu (make-sparse-keymap "Ggtags")))
-    (define-key map "\M-." 'ggtags-find-tag)
+    (define-key map "\M-." 'ggtags-find-tag-dwim)
+    (define-key map (kbd "M-]") 'ggtags-find-reference)
     (define-key map (kbd "C-M-.") 'ggtags-find-tag-regexp)
     (define-key map ggtags-mode-prefix-key ggtags-mode-prefix-map)
     ;; Menu items
@@ -795,12 +808,20 @@ s: symbol              (-s)
     (define-key menu [sep1] menu-bar-separator)
     (define-key menu [query-replace]
       '(menu-item "Query replace" ggtags-query-replace))
-    (define-key menu [find-tag-regexp]
-      '(menu-item "Find tag matching regexp" ggtags-find-tag-regexp))
+    (define-key menu [idutils]
+      '(menu-item "Query idutils DB" ggtags-idutils-query))
+    (define-key menu [grep]
+      '(menu-item "Use grep" ggtags-grep))
+    (define-key menu [find-symbol]
+      '(menu-item "Find other symbol" ggtags-find-other-symbol))
+    (define-key menu [find-reference]
+      '(menu-item "Find reference" ggtags-find-reference))
     (define-key menu [find-tag-resume]
       '(menu-item "Resume find tag" tags-loop-continue))
+    (define-key menu [find-tag-regexp]
+      '(menu-item "Find tag matching regexp" ggtags-find-tag-regexp))
     (define-key menu [find-tag]
-      '(menu-item "Find tag" ggtags-find-tag))
+      '(menu-item "Find tag" ggtags-find-tag-dwim))
     (define-key menu [run-gtags]
       '(menu-item (if (ggtags-root-directory) "Update tag files" "Run gtags")
                   (lambda () (interactive)

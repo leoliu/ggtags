@@ -67,8 +67,7 @@ point is underlined if it is a valid (definition) tag.
 
 ``M-.`` finds definitions or references according to the tag at point,
 i.e. if point is at a definition tag find references and vice versa.
-``C-u M-.`` is verbose and will ask you the name - with completion
-- and the type of tag to search.
+``M-]`` finds references.
 
 If multiple matches are found, navigation mode is entered. In this
 mode, ``M-n`` and ``M-p`` moves to next and previous match, ``M-}``
