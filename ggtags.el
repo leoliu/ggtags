@@ -90,7 +90,8 @@ If nil, use Emacs default."
   :group 'ggtags)
 
 (defcustom ggtags-global-abbreviate-filename 35
-  "Non-nil to display file names abbreviated such as '/u/b/env'."
+  "Non-nil to display file names abbreviated e.g. \"/u/b/env\".
+If an integer abbreviate only names longer than that number."
   :type '(choice (const :tag "No" nil)
                  (const :tag "Always" t)
                  integer)
@@ -302,7 +303,7 @@ Return -1 if it does not exist."
 
 (defun ggtags-read-tag (quick)
   (ggtags-ensure-root-directory)
-  (let ((default (thing-at-point 'symbol))
+  (let ((default (substring-no-properties (or (thing-at-point 'symbol) "")))
         (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
           (if quick (or default (user-error "No tag at point"))
@@ -451,8 +452,8 @@ s: symbols              (-s)
 (defun ggtags-next-mark (&optional arg)
   "Move to the next (newer) mark in the tag marker ring."
   (interactive)
-  (or (> (ring-length find-tag-marker-ring) 1)
-      (user-error "No %s mark" (if arg "previous" "next")))
+  (and (zerop (ring-length find-tag-marker-ring))
+       (user-error "No %s mark" (if arg "previous" "next")))
   (let ((mark (or (and ggtags-current-mark
                        ;; Note `ring-previous' gets newer item.
                        (funcall (if arg #'ring-next #'ring-previous)
@@ -610,7 +611,6 @@ s: symbols              (-s)
 (defvar ggtags-navigation-mode-map
   (let ((map (make-sparse-keymap))
         (menu (make-sparse-keymap "GG-Navigation")))
-    (set-keymap-parent map ggtags-navigation-map)
     ;; Menu items: (info "(elisp)Extended Menu Items")
     (define-key map [menu-bar ggtags-navigation] (cons "GG-Navigation" menu))
     ;; Ordered backwards
