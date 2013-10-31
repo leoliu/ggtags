@@ -79,7 +79,7 @@ which hides the auxiliary window and exits navigation mode. You can
 resume the search using ``M-,``. To abort the search press ``M-*``.
 
 Normally after a few searches a dozen buffers are created visiting
-files tracked by GNU Global. ``C-c k`` helps clean them up.
+files tracked by GNU Global. ``C-c M-k`` helps clean them up.
 
 Development
 ~~~~~~~~~~~

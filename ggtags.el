@@ -46,7 +46,7 @@
 ;; resume the search using `M-,'. To abort the search press `M-*'.
 ;;
 ;; Normally after a few searches a dozen buffers are created visiting
-;; files tracked by GNU Global. `C-c k' helps clean them up.
+;; files tracked by GNU Global. `C-c M-k' helps clean them up.
 
 ;;; Code:
 
@@ -730,12 +730,12 @@ s: symbols              (-s)
 
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
-    (define-key m "p" 'ggtags-prev-mark)
-    (define-key m "n" 'ggtags-next-mark)
-    (define-key m "k" 'ggtags-kill-file-buffers)
-    (define-key m (kbd "DEL") 'ggtags-delete-tag-files)
-    (define-key m "l" 'ggtags-list-tags)
-    (define-key m "q" 'ggtags-query-replace)
+    (define-key m (kbd "M-DEL") 'ggtags-delete-tag-files)
+    (define-key m "\M-p" 'ggtags-prev-mark)
+    (define-key m "\M-n" 'ggtags-next-mark)
+    (define-key m "\M-k" 'ggtags-kill-file-buffers)
+    (define-key m "\M-l" 'ggtags-list-tags)
+    (define-key m (kbd "M-%") 'ggtags-query-replace)
     m))
 
 (defvar ggtags-mode-map
