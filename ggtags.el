@@ -600,6 +600,8 @@ s: symbols              (-s)
     (define-key map "\M-p" 'previous-error)
     (define-key map "\M-}" 'ggtags-navigation-next-file)
     (define-key map "\M-{" 'ggtags-navigation-previous-file)
+    (define-key map "\M->" 'ggtags-navigation-last-error)
+    (define-key map "\M-<" 'ggtags-navigation-first-error)
     (define-key map "\M-o" 'ggtags-navigation-visible-mode)
     (define-key map [return] 'ggtags-navigation-mode-done)
     (define-key map "\r" 'ggtags-navigation-mode-done)
@@ -623,6 +625,10 @@ s: symbols              (-s)
       '(menu-item "Finish navigation" ggtags-navigation-mode-done))
     (define-key menu [abort]
       '(menu-item "Abort" ggtags-navigation-mode-abort))
+    (define-key menu [last-error]
+      '(menu-item "Last error" ggtags-navigation-last-error))
+    (define-key menu [fist-error]
+      '(menu-item "Fist error" ggtags-navigation-first-error))
     (define-key menu [previous-file]
       '(menu-item "Previous file" ggtags-navigation-previous-file))
     (define-key menu [next-file]
@@ -677,6 +683,20 @@ s: symbols              (-s)
 (defun ggtags-navigation-previous-file (n)
   (interactive "p")
   (ggtags-navigation-next-file (- n)))
+
+(defun ggtags-navigation-first-error ()
+  (interactive)
+  (ggtags-ensure-global-buffer
+    (goto-char (point-min))
+    (compilation-next-error 1)
+    (compile-goto-error)))
+
+(defun ggtags-navigation-last-error ()
+  (interactive)
+  (ggtags-ensure-global-buffer
+    (goto-char (point-max))
+    (compilation-previous-error 1)
+    (compile-goto-error)))
 
 (defun ggtags-navigation-visible-mode (&optional arg)
   (interactive (list (or current-prefix-arg 'toggle)))
