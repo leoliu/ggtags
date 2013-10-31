@@ -50,7 +50,13 @@ Enable ``ggtags-mode`` for C/C++/Java modes::
 More languages/modes are supported if `GNU Global
 <http://www.gnu.org/software/global>`_ is compiled with
 ``--with-exuberant-ctags`` to support `exuberant ctags
-<http://ctags.sourceforge.net/>`_.
+<http://ctags.sourceforge.net/>`_. Also set the environment variable
+``GTAGSCONF`` to the correct location of ``gtags.conf``. For example::
+
+  export GTAGSCONF=/usr/local/share/gtags/gtags.conf
+
+See ``plugin-factory/README`` in GNU Global source for further
+information.
 
 Tutorial
 ~~~~~~~~
