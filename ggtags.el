@@ -349,13 +349,14 @@ Return -1 if it does not exist."
                     args)))
     (mapconcat 'identity (delq nil xs) " ")))
 
+;; takes three values: nil, t and a marker
 (defvar ggtags-global-start-marker nil)
 
 (defun ggtags-global-save-start-marker ()
   (when (markerp ggtags-global-start-marker)
     (eval-and-compile (require 'etags))
     (ring-insert find-tag-marker-ring ggtags-global-start-marker)
-    (setq ggtags-global-start-marker nil)))
+    (setq ggtags-global-start-marker t)))
 
 (defun ggtags-global-start (command &optional root)
   (let* ((default-directory (or root (ggtags-root-directory)))
@@ -711,10 +712,13 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
 (defun ggtags-navigation-mode-abort ()
   (interactive)
   (ggtags-navigation-mode -1)
-  (ggtags-navigation-mode-cleanup nil 0)
   ;; Run after (ggtags-navigation-mode -1) or
   ;; ggtags-global-start-marker might not have been saved.
-  (pop-tag-mark))
+  (when (and (not (markerp ggtags-global-start-marker))
+             ggtags-global-start-marker)
+    (setq ggtags-global-start-marker nil)
+    (pop-tag-mark))
+  (ggtags-navigation-mode-cleanup nil 0))
 
 (defun ggtags-navigation-next-file (n)
   (interactive "p")
