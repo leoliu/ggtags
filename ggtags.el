@@ -268,14 +268,14 @@ Return -1 if it does not exist."
 (defun ggtags-ensure-root-directory ()
   (or (ggtags-root-directory)
       (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
-                (error "Aborted"))
+                (user-error "Aborted"))
         (let ((root (read-directory-name "Directory: " nil nil t)))
-          (and (zerop (length root)) (error "No directory chosen"))
+          (and (zerop (length root)) (user-error "No directory chosen"))
           (when (let ((process-environment
                        (if (and (not (getenv "GTAGSLABEL"))
                                 (yes-or-no-p "Use `ctags' backend? "))
-                           (cons "GTAGSLABEL=ctags" process-environment))
-                       process-environment)
+                           (cons "GTAGSLABEL=ctags" process-environment)
+                         process-environment))
                       (default-directory (file-name-as-directory root)))
                   (and (apply #'ggtags-process-string
                               "gtags" (and ggtags-use-idutils '("--idutils")))
