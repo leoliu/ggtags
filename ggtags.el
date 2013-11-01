@@ -524,6 +524,8 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
                  (if (re-search-backward "^\\([0-9]+\\) \\w+ located" nil t)
                      (string-to-number (match-string 1))
                    0))))
+    ;; Clear the start marker in case of zero matches.
+    (and (zerop count) (setq ggtags-global-start-marker nil))
     (cons (if (> exit-status 0)
               msg
             (format "found %d %s" count (if (= count 1) "match" "matches")))
@@ -689,8 +691,6 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
       (goto-char orig))))
 
 (defun ggtags-navigation-mode-cleanup (&optional buf time)
-  ;; Clear the marker in case of zero matches.
-  (setq ggtags-global-start-marker nil)
   (let ((buf (or buf compilation-last-buffer)))
     (and (buffer-live-p buf)
          (with-current-buffer buf
@@ -752,6 +752,9 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
         (add-hook 'next-error-hook 'ggtags-move-to-tag)
         (add-hook 'next-error-hook 'ggtags-global-save-start-marker)
         (add-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function))
+    ;; Call `ggtags-global-save-start-marker' in case of exiting from
+    ;; `ggtags-handle-single-match' for single match.
+    (ggtags-global-save-start-marker)
     (remove-hook 'next-error-hook 'ggtags-global-save-start-marker)
     (remove-hook 'next-error-hook 'ggtags-move-to-tag)
     (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function)))
