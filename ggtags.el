@@ -368,11 +368,13 @@ Return -1 if it does not exist."
   (ggtags-global-start (ggtags-global-build-command cmd name)))
 
 ;;;###autoload
-(defun ggtags-find-tag-dwim (name)
+(defun ggtags-find-tag-dwim (name &optional force)
   "Find definitions or references of tag NAME by context.
-If point is at a definition tag, find references, and vice versa."
-  (interactive (list (ggtags-read-tag)))
-  (if (or (ggtags-cache-ctags-p (ggtags-root-directory))
+If point is at a definition tag, find references, and vice versa.
+With a prefix arg (non-nil FORCE) always find defintions."
+  (interactive (list (ggtags-read-tag) current-prefix-arg))
+  (if (or force
+          (ggtags-cache-ctags-p (ggtags-root-directory))
           (not buffer-file-name))
       (ggtags-find-tag 'definition name)
     (ggtags-find-tag (format "--from-here=%d:%s"
