@@ -174,6 +174,13 @@ properly update `ggtags-mode-map'."
          (error "No global buffer found"))
      (with-current-buffer compilation-last-buffer ,@body)))
 
+(defmacro ggtags-with-ctags-maybe (&rest body)
+  `(let ((process-environment
+          (if (ggtags-cache-ctags-p (ggtags-root-directory))
+              (cons "GTAGSLABEL=ctags" process-environment))
+          process-environment))
+     ,@body))
+
 (defun ggtags-oversize-p ()
   (pcase ggtags-oversize-limit
     (`nil nil)
@@ -279,15 +286,12 @@ Return -1 if it does not exist."
 (defun ggtags-update-tags (&optional single-update)
   "Update GNU Global tag database."
   (interactive)
-  (let ((process-environment
-         (if (ggtags-cache-ctags-p (ggtags-root-directory))
-             (cons "GTAGSLABEL=ctags" process-environment))
-         process-environment))
-    (if single-update
-        (when buffer-file-name
-          (process-file "global" nil 0 nil "--single-update"
-                        (file-truename buffer-file-name)))
-      (ggtags-process-string "global" "-u"))))
+  (ggtags-with-ctags-maybe
+   (if single-update
+       (when buffer-file-name
+         (process-file "global" nil 0 nil "--single-update"
+                       (file-truename buffer-file-name)))
+     (ggtags-process-string "global" "-u"))))
 
 (defun ggtags-tag-names-1 (root &optional from-cache)
   (when root
@@ -354,11 +358,12 @@ Return -1 if it does not exist."
     (setq ggtags-global-start-marker nil)))
 
 (defun ggtags-global-start (command &optional root)
-  (let ((default-directory (or root (ggtags-root-directory)))
-        (split-window-preferred-function ggtags-split-window-function))
+  (let* ((default-directory (or root (ggtags-root-directory)))
+         (split-window-preferred-function ggtags-split-window-function))
     (setq ggtags-global-start-marker (point-marker))
     (ggtags-navigation-mode +1)
-    (compilation-start command 'ggtags-global-mode)))
+    (ggtags-with-ctags-maybe
+     (compilation-start command 'ggtags-global-mode))))
 
 (defun ggtags-find-tag-resume ()
   (interactive)
@@ -429,7 +434,8 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
                    (file-name-as-directory file-or-directory)
                  (file-name-directory file-or-directory)))
          (cmd (ggtags-global-build-command
-               nil nil "-e" regexp
+               nil nil
+               (format "-e %S" regexp)
                (if (file-directory-p file-or-directory)
                    "-l ."
                  (concat "-f " (shell-quote-argument
@@ -711,9 +717,11 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
 
 (defun ggtags-navigation-mode-abort ()
   (interactive)
-  (pop-tag-mark)
   (ggtags-navigation-mode -1)
-  (ggtags-navigation-mode-cleanup nil 0))
+  (ggtags-navigation-mode-cleanup nil 0)
+  ;; Run after (ggtags-navigation-mode -1) or
+  ;; ggtags-global-start-marker might not have been saved.
+  (pop-tag-mark))
 
 (defun ggtags-navigation-next-file (n)
   (interactive "p")
@@ -925,7 +933,8 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
     (let ((file (file-truename buffer-file-name)))
       (with-temp-buffer
         (when (with-demoted-errors
-                (zerop (process-file "global" nil t nil "-f" file)))
+                (zerop (ggtags-with-ctags-maybe
+                        (process-file "global" nil t nil "-x" "-f" file))))
           (goto-char (point-min))
           (loop while (re-search-forward
                        "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
