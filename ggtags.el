@@ -119,6 +119,12 @@ If an integer abbreviate only names longer than that number."
                  (const cscope))
   :group 'ggtags)
 
+(defcustom ggtags-global-ignore-case nil
+  "Non-nil if Global should ignore case."
+  :safe 'booleanp
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-mode-prefix-key "\C-c"
   "Key binding used for `ggtags-mode-prefix-map'.
 Users should change the value using `customize-variable' to
@@ -321,6 +327,7 @@ Return -1 if it does not exist."
   ;; CMD can be definition, reference, symbol, grep, idutils
   (let ((xs (append (list "global" "-v"
                           (format "--result=%s" ggtags-global-output-format)
+                          (and ggtags-global-ignore-case "--ignore-case")
                           (and ggtags-global-has-color "--color")
                           (and ggtags-global-has-path-style
                                "--path-style=shorter")
