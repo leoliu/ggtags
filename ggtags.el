@@ -36,16 +36,20 @@
 ;; point, i.e. if point is at a definition tag find references and
 ;; vice versa. `M-]' finds references.
 ;;
-;; If multiple matches are found, navigation mode is entered. In this
-;; mode, `M-n' and `M-p' moves to next and previous match, `M-}' and
-;; `M-{' to next and previous file respectively. `M-o' toggles between
-;; full and abbreviated displays of file names in the auxiliary popup
-;; window. When you locate the right match, press RET to finish which
-;; hides the auxiliary window and exits navigation mode. You can
-;; resume the search using `M-,'. To abort the search press `M-*'.
+;; If multiple matches are found, navigation mode is entered, the
+;; mode-line lighter changed, and a navigation menu-bar entry
+;; presented. In this mode, `M-n' and `M-p' moves to next and previous
+;; match, `M-}' and `M-{' to next and previous file respectively.
+;; `M-o' toggles between full and abbreviated displays of file names
+;; in the auxiliary popup window. When you locate the right match,
+;; press RET to finish which hides the auxiliary window and exits
+;; navigation mode. You can resume the search using `M-,'. To abort
+;; the search press `M-*'.
 ;;
 ;; Normally after a few searches a dozen buffers are created visiting
 ;; files tracked by GNU Global. `C-c M-k' helps clean them up.
+;;
+;; Check the menu-bar entry `Ggtags' for other useful commands.
 
 ;;; Code:
 
@@ -368,12 +372,12 @@ Return -1 if it does not exist."
   (ggtags-global-start (ggtags-global-build-command cmd name)))
 
 ;;;###autoload
-(defun ggtags-find-tag-dwim (name &optional force)
+(defun ggtags-find-tag-dwim (name &optional definition)
   "Find definitions or references of tag NAME by context.
 If point is at a definition tag, find references, and vice versa.
-With a prefix arg (non-nil FORCE) always find defintions."
+With a prefix arg (non-nil DEFINITION) always find defintions."
   (interactive (list (ggtags-read-tag) current-prefix-arg))
-  (if (or force
+  (if (or definition
           (ggtags-cache-ctags-p (ggtags-root-directory))
           (not buffer-file-name))
       (ggtags-find-tag 'definition name)
@@ -388,11 +392,12 @@ With a prefix arg (non-nil FORCE) always find defintions."
   (ggtags-find-tag 'reference name))
 
 (defun ggtags-find-other-symbol (name)
-  ;; Other than definition or reference
+  "Find tag NAME wchi is a reference without a definition."
   (interactive (list (ggtags-read-tag)))
   (ggtags-find-tag 'symbol name))
 
 (defun ggtags-read-string (prompt)
+  "Like `read-string' but handle default automatically."
   (ggtags-ensure-root-directory)
   (let ((prompt (if (string-match ": *\\'" prompt)
                     (substring prompt 0 (match-beginning 0))
@@ -821,6 +826,9 @@ With a prefix arg (non-nil FORCE) always find defintions."
     (define-key menu [delete-tags]
       '(menu-item "Delete tag files" ggtags-delete-tag-files
                   :enable (ggtags-root-directory)))
+    (define-key menu [pop-mark]
+      '(menu-item "Pop mark" pop-tag-mark
+                  :help "Pop to previous mark and destroy it"))
     (define-key menu [next-mark]
       '(menu-item "Next mark" ggtags-next-mark))
     (define-key menu [prev-mark]
