@@ -415,31 +415,24 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
 
 (defun ggtags-grep (pattern)
   (interactive (list (ggtags-read-string "Grep pattern")))
-  (ggtags-find-tag 'grep pattern))
+  (ggtags-find-tag 'grep (format "--regexp %S" pattern)))
 
 (defun ggtags-idutils-query (pattern)
   (interactive (list (ggtags-read-string "ID query pattern")))
-  (ggtags-find-tag 'idutils pattern))
+  (ggtags-find-tag 'idutils (format "--regexp %S" pattern)))
 
 ;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
-(defun ggtags-find-tag-regexp (regexp file-or-directory)
-  "List all tags matching REGEXP in FILE-OR-DIRECTORY."
+(defun ggtags-find-tag-regexp (regexp directory)
+  "List tags matching REGEXP in DIRECTORY (default to project root)."
   (interactive
    (list (ggtags-read-string "POSIX regexp")
          (if current-prefix-arg
-             (read-file-name "File or directory: " nil buffer-file-name t)
+             (read-directory-name "Directory: " nil nil t)
            (ggtags-root-directory))))
   (ggtags-check-root-directory)
-  (let* ((root (if (file-directory-p file-or-directory)
-                   (file-name-as-directory file-or-directory)
-                 (file-name-directory file-or-directory)))
-         (cmd (ggtags-global-build-command
-               nil nil
-               (format "-e %S" regexp)
-               (if (file-directory-p file-or-directory)
-                   "-l ."
-                 (concat "-f " (shell-quote-argument
-                                (file-name-nondirectory file-or-directory)))))))
+  (let ((root (file-name-as-directory directory))
+        (cmd (ggtags-global-build-command
+              nil nil "-l" "--regexp" (prin1-to-string regexp))))
     (ggtags-global-start cmd root)))
 
 (defun ggtags-query-replace (from to &optional delimited directory)
