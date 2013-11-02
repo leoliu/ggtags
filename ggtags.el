@@ -390,9 +390,16 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
                          prompt default)
                  nil nil (and default (substring-no-properties default)))))
 
-(defun ggtags-grep (pattern)
-  (interactive (list (ggtags-read-string "Grep pattern")))
-  (ggtags-find-tag 'grep (format "--regexp %S" pattern)))
+(defun ggtags-grep (pattern &optional invert-match)
+  "Use `global --grep' to search for lines matching PATTERN.
+Invert the match when called with a prefix arg \\[universal-argument]."
+  (interactive (list (ggtags-read-string (if current-prefix-arg
+                                             "Grep inverted pattern"
+                                           "Grep pattern"))
+                     current-prefix-arg))
+  (ggtags-find-tag 'grep (format "%s--regexp %S"
+                                 (and invert-match "--invert-match ")
+                                 pattern)))
 
 (defun ggtags-idutils-query (pattern)
   (interactive (list (ggtags-read-string "ID query pattern")))
@@ -521,7 +528,7 @@ Global and Emacs."
      (ctags-x "^\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\)[ \t]+\\(\\(?:[^/\n]*/\\)?[^ \t\n]+\\)"
               3 2 nil nil 3 (1 font-lock-function-name-face))
      ;; src/dialog.cc:172:#undef ACTIVE_ESCAPE
-     (grep "^\\(.+?\\):\\([0-9]+\\):\\(?:[^0-9\n]\\|[0-9][^0-9\n]\\|[0-9][0-9].\\)"
+     (grep "^\\(.+?\\):\\([0-9]+\\):\\(?:$\\|[^0-9\n]\\|[0-9][^0-9\n]\\|[0-9][0-9].\\)"
            1 2 nil nil 1)
      ;; src/dialog.cc ACTIVE_ESCAPE 172 #undef ACTIVE_ESCAPE
      (cscope "^\\(.+?\\)[ \t]+\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\).*\\(?:[^0-9\n]\\|[^0-9\n][0-9]\\|[^:\n][0-9][0-9]\\)$"
