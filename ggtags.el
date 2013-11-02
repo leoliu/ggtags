@@ -272,8 +272,7 @@ properly update `ggtags-mode-map'."
                        (file-truename buffer-file-name)))
      (ggtags-process-string "global" "-u"))))
 
-;;;###autoload
-(defun ggtags-completion-table ()
+(defvar ggtags-completion-table
   (let (cache)
     (completion-table-dynamic
      (lambda (prefix)
@@ -303,7 +302,7 @@ properly update `ggtags-mode-map'."
           (cond (current-prefix-arg
                  (completing-read
                   (format (if default "Tag (default %s): " "Tag: ") default)
-                  (ggtags-completion-table) nil t nil nil default))
+                  ggtags-completion-table nil t nil nil default))
                 ((not default)
                  (user-error "No tag at point"))
                 (t (substring-no-properties default))))))
@@ -876,7 +875,7 @@ Global and Emacs."
            (valid-tag (when bounds
                         (test-completion
                          (buffer-substring (car bounds) (cdr bounds))
-                         (ggtags-completion-table))))
+                         ggtags-completion-table)))
            (o ggtags-tag-overlay)
            (done-p (lambda ()
                      (and (memq o (overlays-at (car bounds)))
@@ -932,7 +931,7 @@ Global and Emacs."
             (and (not (equal he-search-string ""))
                  (ggtags-find-project)
                  (sort (all-completions he-search-string
-                                        (ggtags-completion-table))
+                                        ggtags-completion-table)
                        'string-lessp))))
     (if (null he-expand-list)
         (progn
