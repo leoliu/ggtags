@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.6.8
+;; Version: 0.7.0
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -758,7 +758,7 @@ Global and Emacs."
   "Kill all buffers visiting files in current project."
   (interactive "p")
   (ggtags-check-project)
-  (let ((root (ggtags-current-project-root))
+  (let ((directories (cons (ggtags-current-project-root) (ggtags-get-libpath)))
         (count 0)
         (some (lambda (pred list)
                 (loop for x in list when (funcall pred x) return it))))
@@ -766,11 +766,10 @@ Global and Emacs."
       (let ((file (and (buffer-live-p buf)
                        (not (eq buf (current-buffer)))
                        (buffer-file-name buf))))
-        (when (and file (funcall some (apply-partially #'file-in-directory-p
-                                                       (file-truename file))
-                                 (cons root (ggtags-get-libpath))))
-          (and (kill-buffer buf)
-               (incf count)))))
+        (when (and file (funcall some
+                                 (apply-partially #'file-in-directory-p file)
+                                 directories))
+          (and (kill-buffer buf) (incf count)))))
     (and interactive
          (message "%d %s killed" count (if (= count 1) "buffer" "buffers")))))
 
