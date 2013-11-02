@@ -145,8 +145,6 @@ properly update `ggtags-mode-map'."
 
 (defvar ggtags-bug-url "https://github.com/leoliu/ggtags/issues")
 
-(defvar ggtags-cache nil)         ; (ROOT TABLE DIRTY CTAGS TIMESTAMP)
-
 (defvar ggtags-current-tag-name nil)
 
 ;; Used by ggtags-global-mode
@@ -176,70 +174,15 @@ properly update `ggtags-mode-map'."
 
 (defmacro ggtags-with-ctags-maybe (&rest body)
   `(let ((process-environment
-          (if (ggtags-cache-ctags-p (ggtags-root-directory))
+          (if (and (ggtags-find-project)
+                   (ggtags-project-ctags-p (ggtags-find-project)))
               (cons "GTAGSLABEL=ctags" process-environment)
             process-environment)))
      ,@body))
 
-(defun ggtags-oversize-p ()
-  (pcase ggtags-oversize-limit
-    (`nil nil)
-    (`t t)
-    (t (when (ggtags-root-directory)
-         (> (or (nth 7 (file-attributes
-                        (expand-file-name "GTAGS" (ggtags-root-directory))))
-                0)
-            ggtags-oversize-limit)))))
-
-(defun ggtags-use-ctags-p (root)
-  "Non-nil if exuberant-ctags is used for indexing ROOT."
-  (let ((default-directory (file-name-as-directory root)))
-    ;; Check if GRTAGS contains no tags.
-    (<= (length (split-string (shell-command-to-string
-                               "gtags -d GRTAGS | head -10")
-                              "\n" t))
-        4)))
-
-(defun ggtags-get-timestamp (root)
-  "Get the timestamp (float) of file GTAGS in ROOT directory.
-Return -1 if it does not exist."
-  (let ((file (expand-file-name "GTAGS" root)))
-    (if (file-exists-p file)
-        (float-time (nth 5 (file-attributes file)))
-      -1)))
-
 (defun ggtags-get-libpath ()
   (split-string (or (getenv "GTAGSLIBPATH") "")
                 (regexp-quote path-separator) t))
-
-(defun ggtags-cache-get (key)
-  (assoc (file-truename key) ggtags-cache))
-
-(defun ggtags-cache-set (key val &optional dirty)
-  (let* ((key (file-truename key))
-         (c (ggtags-cache-get key))
-         (ctags (ggtags-use-ctags-p key)))
-    (if c
-        (setcdr c (list val dirty ctags (float-time)))
-      (push (list key val dirty ctags (float-time)) ggtags-cache))))
-
-(defun ggtags-cache-mark-dirty (key flag)
-  "Return non-nil if operation is successful."
-  (let ((cache (ggtags-cache-get key)))
-    (when cache
-      (setcar (cddr cache) flag))))
-
-(defun ggtags-cache-ctags-p (key)
-  (fourth (ggtags-cache-get key)))
-
-(defun ggtags-cache-dirty-p (key)
-  "Value is non-nil if 'global -u' is needed."
-  (third (ggtags-cache-get key)))
-
-(defun ggtags-cache-stale-p (key)
-  "Value is non-nil if tags in cache needs to be rebuilt."
-  (> (ggtags-get-timestamp key)
-     (or (fifth (ggtags-cache-get key)) 0)))
 
 (defun ggtags-process-string (program &rest args)
   (with-temp-buffer
@@ -252,21 +195,57 @@ Return -1 if it does not exist."
           (error "`%s' non-zero exit: %s" program output))
       output)))
 
-(defvar-local ggtags-root-directory nil
-  "Internal; use function `ggtags-root-directory' instead.")
+;;; Store for project settings
+
+(defvar ggtags-projects (make-hash-table :size 7 :test #'equal))
+
+(defstruct (ggtags-project (:constructor ggtags-project--make)
+                           (:copier nil)
+                           (:type vector)
+                           :named)
+  root dirty-p ctags-p oversize-p)
+
+(defun ggtags-make-project (root &optional ctags-p)
+  (check-type root string)
+  (let* ((root (file-truename (file-name-as-directory root)))
+         (ctags-p (or ctags-p
+                      (<= (length
+                           (split-string (let ((default-directory root))
+                                           (shell-command-to-string
+                                            "gtags -d GRTAGS | head -10"))
+                                         "\n" t))
+                          4)))
+         (oversize-p (pcase ggtags-oversize-limit
+                       (`nil nil)
+                       (`t t)
+                       (t (> (or (nth 7 (file-attributes
+                                         (expand-file-name "GTAGS" root)))
+                                 0)
+                             ggtags-oversize-limit)))))
+    (puthash root (ggtags-project--make
+                   :root root :ctags-p ctags-p :oversize-p oversize-p)
+             ggtags-projects)))
+
+(defvar-local ggtags-project nil)
 
 ;;;###autoload
-(defun ggtags-root-directory ()
-  (or ggtags-root-directory
-      (setq ggtags-root-directory
-            (ignore-errors (file-name-as-directory
-                            (ggtags-process-string "global" "-pr"))))))
+(defun ggtags-find-project ()
+  (or ggtags-project
+      (let ((root (ignore-errors (file-name-as-directory
+                                  (ggtags-process-string "global" "-pr")))))
+        (and root (setq ggtags-project
+                        (or (gethash (file-truename root) ggtags-projects)
+                            (ggtags-make-project root)))))))
 
-(defun ggtags-check-root-directory ()
-  (or (ggtags-root-directory) (error "File GTAGS not found")))
+(defun ggtags-current-project-root ()
+  (and (ggtags-find-project)
+       (ggtags-project-root (ggtags-find-project))))
 
-(defun ggtags-ensure-root-directory ()
-  (or (ggtags-root-directory)
+(defun ggtags-check-project ()
+  (or (ggtags-find-project) (error "File GTAGS not found")))
+
+(defun ggtags-ensure-project ()
+  (or (ggtags-find-project)
       (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
                 (user-error "Aborted"))
         (let ((root (read-directory-name "Directory: " nil nil t)))
@@ -279,9 +258,9 @@ Return -1 if it does not exist."
                       (default-directory (file-name-as-directory root)))
                   (and (apply #'ggtags-process-string
                               "gtags" (and ggtags-use-idutils '("--idutils")))
+                       (ggtags-make-project root)
                        t))
-            (ggtags-tag-names-1 root)   ; update cache
-            (message "GTAGS generated in `%s'" (ggtags-root-directory)))))))
+            (message "GTAGS generated in `%s'" root))))))
 
 (defun ggtags-update-tags (&optional single-update)
   "Update GNU Global tag database."
@@ -293,40 +272,38 @@ Return -1 if it does not exist."
                        (file-truename buffer-file-name)))
      (ggtags-process-string "global" "-u"))))
 
-(defun ggtags-tag-names-1 (root &optional from-cache)
-  (when root
-    (if (and (not from-cache) (ggtags-cache-stale-p root))
-        (let* ((default-directory (file-name-as-directory root))
-               (tags (with-demoted-errors
-                       (process-lines "global" "-c" ""))))
-          (and tags (ggtags-cache-set root tags))
-          tags)
-      (cadr (ggtags-cache-get root)))))
-
 ;;;###autoload
-(defun ggtags-tag-names (&optional from-cache)
-  "Get a list of tag names."
-  (let ((root (ggtags-root-directory)))
-    (when (and root
-               (not (ggtags-oversize-p))
-               (not from-cache)
-               (ggtags-cache-dirty-p root))
-      (ggtags-update-tags))
-    (apply 'append (mapcar (lambda (r)
-                             (ggtags-tag-names-1 r from-cache))
-                           (cons root (ggtags-get-libpath))))))
+(defun ggtags-completion-table ()
+  (let (cache)
+    (completion-table-dynamic
+     (lambda (prefix)
+       (when (ggtags-find-project)
+         (when (and (ggtags-project-dirty-p (ggtags-find-project))
+                    (not (ggtags-project-oversize-p (ggtags-find-project))))
+           (ggtags-update-tags)
+           (setf (ggtags-project-dirty-p (ggtags-find-project)) nil))
+         (unless (equal prefix (car cache))
+           (setq cache
+                 (cons prefix
+                       (ggtags-with-ctags-maybe
+                        (split-string
+                         (apply #'ggtags-process-string
+                                "global"
+                                (if completion-ignore-case
+                                    (list "--ignore-case" "-Tc" prefix)
+                                  (list "-Tc" prefix)))
+                         "\n" t))))))
+       (cdr cache)))))
 
 (defun ggtags-read-tag ()
-  (ggtags-ensure-root-directory)
+  (ggtags-ensure-project)
   (let ((default (thing-at-point 'symbol))
         (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
           (cond (current-prefix-arg
                  (completing-read
                   (format (if default "Tag (default %s): " "Tag: ") default)
-                  ;; XXX: build tag names more lazily such as using
-                  ;; `completion-table-dynamic'.
-                  (ggtags-tag-names) nil t nil nil default))
+                  (ggtags-completion-table) nil t nil nil default))
                 ((not default)
                  (user-error "No tag at point"))
                 (t (substring-no-properties default))))))
@@ -359,7 +336,7 @@ Return -1 if it does not exist."
     (setq ggtags-global-start-marker t)))
 
 (defun ggtags-global-start (command &optional root)
-  (let* ((default-directory (or root (ggtags-root-directory)))
+  (let* ((default-directory (or root (ggtags-current-project-root)))
          (split-window-preferred-function ggtags-split-window-function))
     (setq ggtags-global-start-marker (point-marker))
     (ggtags-navigation-mode +1)
@@ -374,7 +351,7 @@ Return -1 if it does not exist."
       (compile-goto-error))))
 
 (defun ggtags-find-tag (cmd name)
-  (ggtags-check-root-directory)
+  (ggtags-check-project)
   (ggtags-global-start (ggtags-global-build-command cmd name)))
 
 ;;;###autoload
@@ -384,7 +361,7 @@ If point is at a definition tag, find references, and vice versa.
 With a prefix arg (non-nil DEFINITION) always find defintions."
   (interactive (list (ggtags-read-tag) current-prefix-arg))
   (if (or definition
-          (ggtags-cache-ctags-p (ggtags-root-directory))
+          (ggtags-current-project-root)
           (not buffer-file-name))
       (ggtags-find-tag 'definition name)
     (ggtags-find-tag (format "--from-here=%d:%s"
@@ -404,7 +381,7 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
 
 (defun ggtags-read-string (prompt)
   "Like `read-string' but handle default automatically."
-  (ggtags-ensure-root-directory)
+  (ggtags-ensure-project)
   (let ((prompt (if (string-match ": *\\'" prompt)
                     (substring prompt 0 (match-beginning 0))
                   prompt))
@@ -429,8 +406,8 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
    (list (ggtags-read-string "POSIX regexp")
          (if current-prefix-arg
              (read-directory-name "Directory: " nil nil t)
-           (ggtags-root-directory))))
-  (ggtags-check-root-directory)
+           (ggtags-current-project-root))))
+  (ggtags-check-project)
   (let ((root (file-name-as-directory directory))
         (cmd (ggtags-global-build-command
               nil nil "-l" "--regexp" (prin1-to-string regexp))))
@@ -440,8 +417,8 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
   "Query replace FROM with TO on files in the Global buffer.
 If not in navigation mode, do a grep on FROM first.
 
-Note: the regexp FROM must be supported both by Global and
-Emacs."
+Note: the regular expression FROM must be supported by both
+Global and Emacs."
   (interactive (query-replace-read-args "Query replace (regexp)" t t))
   (unless (bound-and-true-p ggtags-navigation-mode)
     (let ((ggtags-auto-jump-to-first-match nil))
@@ -466,8 +443,8 @@ Emacs."
 (defun ggtags-delete-tag-files ()
   "Delete the tag files generated by gtags."
   (interactive)
-  (when (ggtags-root-directory)
-    (let ((files (directory-files (ggtags-root-directory) t
+  (when (ggtags-current-project-root)
+    (let ((files (directory-files (ggtags-current-project-root) t
                                   (regexp-opt '("GPATH" "GRTAGS" "GTAGS" "ID"))))
           (buffer "*GTags File List*"))
       (or files (user-error "No tag files found"))
@@ -771,8 +748,8 @@ Emacs."
 (defun ggtags-kill-file-buffers (&optional interactive)
   "Kill all buffers visiting files in the root directory."
   (interactive "p")
-  (ggtags-check-root-directory)
-  (let ((root (ggtags-root-directory))
+  (ggtags-check-project)
+  (let ((root (ggtags-current-project-root))
         (count 0)
         (some (lambda (pred list)
                 (loop for x in list when (funcall pred x) return it))))
@@ -789,12 +766,12 @@ Emacs."
          (message "%d %s killed" count (if (= count 1) "buffer" "buffers")))))
 
 (defun ggtags-after-save-function ()
-  (let ((root (with-demoted-errors (ggtags-root-directory))))
-    (when root
-      (ggtags-cache-mark-dirty root t)
-      ;; When oversize update on a per-save basis.
-      (when (and buffer-file-name (ggtags-oversize-p))
-        (ggtags-update-tags 'single-update)))))
+  (when (ggtags-find-project)
+    (setf (ggtags-project-dirty-p (ggtags-find-project)) t)
+    ;; When oversize update on a per-save basis.
+    (when (and buffer-file-name
+               (ggtags-project-oversize-p (ggtags-find-project)))
+      (ggtags-update-tags 'single-update))))
 
 (defvar ggtags-tag-overlay nil)
 (defvar ggtags-highlight-tag-timer nil)
@@ -897,8 +874,9 @@ Emacs."
       (overlay-put ggtags-tag-overlay 'ggtags t))
     (let* ((bounds (bounds-of-thing-at-point 'symbol))
            (valid-tag (when bounds
-                        (member (buffer-substring (car bounds) (cdr bounds))
-                                (ggtags-tag-names (ggtags-oversize-p)))))
+                        (test-completion
+                         (buffer-substring (car bounds) (cdr bounds))
+                         (ggtags-completion-table))))
            (o ggtags-tag-overlay)
            (done-p (lambda ()
                      (and (memq o (overlays-at (car bounds)))
@@ -952,9 +930,9 @@ Emacs."
                       (point))
       (setq he-expand-list
             (and (not (equal he-search-string ""))
-                 (with-demoted-errors (ggtags-root-directory))
+                 (ggtags-find-project)
                  (sort (all-completions he-search-string
-                                        (ggtags-tag-names))
+                                        (ggtags-completion-table))
                        'string-lessp))))
     (if (null he-expand-list)
         (progn
