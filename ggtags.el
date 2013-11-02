@@ -177,8 +177,8 @@ properly update `ggtags-mode-map'."
 (defmacro ggtags-with-ctags-maybe (&rest body)
   `(let ((process-environment
           (if (ggtags-cache-ctags-p (ggtags-root-directory))
-              (cons "GTAGSLABEL=ctags" process-environment))
-          process-environment))
+              (cons "GTAGSLABEL=ctags" process-environment)
+            process-environment)))
      ,@body))
 
 (defun ggtags-oversize-p ()
