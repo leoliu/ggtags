@@ -399,7 +399,7 @@ Invert the match when called with a prefix arg \\[universal-argument]."
                                            "Grep pattern"))
                      current-prefix-arg))
   (ggtags-find-tag 'grep (format "%s--regexp %S"
-                                 (and invert-match "--invert-match ")
+                                 (if invert-match "--invert-match " "")
                                  pattern)))
 
 (defun ggtags-idutils-query (pattern)
