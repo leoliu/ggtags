@@ -245,6 +245,7 @@ properly update `ggtags-mode-map'."
   (or (ggtags-find-project) (error "File GTAGS not found")))
 
 (defun ggtags-ensure-project ()
+  (interactive)
   (or (ggtags-find-project)
       (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
                 (user-error "Aborted"))
@@ -463,7 +464,9 @@ Global and Emacs."
             (progn
               (fit-window-to-buffer win)
               (when (yes-or-no-p "Remove GNU Global tag files? ")
-                (mapc 'delete-file files)))
+                (mapc 'delete-file files)
+                (remhash (ggtags-current-project-root) ggtags-projects)
+                (kill-local-variable 'ggtags-project)))
           (when (window-live-p win)
             (quit-window t win)))))))
 
@@ -752,7 +755,7 @@ Global and Emacs."
   (setq-local ggtags-navigation-mode nil))
 
 (defun ggtags-kill-file-buffers (&optional interactive)
-  "Kill all buffers visiting files in the root directory."
+  "Kill all buffers visiting files in current project."
   (interactive "p")
   (ggtags-check-project)
   (let ((root (ggtags-current-project-root))
@@ -816,7 +819,10 @@ Global and Emacs."
     (define-key menu [sep2] menu-bar-separator)
     (define-key menu [delete-tags]
       '(menu-item "Delete tag files" ggtags-delete-tag-files
-                  :enable (ggtags-root-directory)))
+                  :enable (ggtags-find-project)))
+    (define-key menu [kill-buffers]
+      '(menu-item "Kill buffers visiting project files" ggtags-kill-file-buffers
+                  :enable (ggtags-find-project)))
     (define-key menu [pop-mark]
       '(menu-item "Pop mark" pop-tag-mark
                   :help "Pop to previous mark and destroy it"))
@@ -841,12 +847,12 @@ Global and Emacs."
       '(menu-item "Find tag matching regexp" ggtags-find-tag-regexp))
     (define-key menu [find-tag]
       '(menu-item "Find tag" ggtags-find-tag-dwim))
+    (define-key menu [update-tags]
+      '(menu-item "Update tag files" ggtags-update-tags
+                  :visible (ggtags-find-project)))
     (define-key menu [run-gtags]
-      '(menu-item (if (ggtags-root-directory) "Update tag files" "Run gtags")
-                  (lambda () (interactive)
-                    (if (ggtags-root-directory)
-                        (ggtags-update-tags)
-                      (ggtags-ensure-root-directory)))))
+      '(menu-item "Run gtags" ggtags-ensure-project
+                  :visible (not (ggtags-find-project))))
     map))
 
 (defun ggtags-mode-update-prefix-key (symbol value)
