@@ -143,6 +143,12 @@ properly update `ggtags-mode-map'."
   :type 'function
   :group 'ggtags)
 
+(defcustom ggtags-bounds-of-tag-function (lambda ()
+                                           (bounds-of-thing-at-point 'symbol))
+  "Function to get the start and end locations of the tag at point."
+  :type 'function
+  :group 'ggtags)
+
 (defvar ggtags-bug-url "https://github.com/leoliu/ggtags/issues")
 
 (defvar ggtags-current-tag-name nil)
@@ -194,6 +200,10 @@ properly update `ggtags-mode-map'."
       (or (zerop exit)
           (error "`%s' non-zero exit: %s" program output))
       output)))
+
+(defun ggtags-tag-at-point ()
+  (let ((bounds (funcall ggtags-bounds-of-tag-function)))
+    (and bounds (buffer-substring (car bounds) (cdr bounds)))))
 
 ;;; Store for project settings
 
@@ -297,7 +307,7 @@ properly update `ggtags-mode-map'."
 
 (defun ggtags-read-tag ()
   (ggtags-ensure-project)
-  (let ((default (thing-at-point 'symbol))
+  (let ((default (ggtags-tag-at-point))
         (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
           (cond (current-prefix-arg
@@ -385,7 +395,7 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
   (let ((prompt (if (string-match ": *\\'" prompt)
                     (substring prompt 0 (match-beginning 0))
                   prompt))
-        (default (thing-at-point 'symbol)))
+        (default (ggtags-tag-at-point)))
     (read-string (format (if default "%s (default `%s'): "
                            "%s: ")
                          prompt default)
@@ -883,7 +893,7 @@ Global and Emacs."
     (unless (overlayp ggtags-tag-overlay)
       (setq ggtags-tag-overlay (make-overlay (point) (point)))
       (overlay-put ggtags-tag-overlay 'ggtags t))
-    (let* ((bounds (bounds-of-thing-at-point 'symbol))
+    (let* ((bounds (funcall ggtags-bounds-of-tag-function))
            (valid-tag (when bounds
                         (test-completion
                          (buffer-substring (car bounds) (cdr bounds))
