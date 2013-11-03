@@ -43,7 +43,7 @@
 ;; `M-o' toggles between full and abbreviated displays of file names
 ;; in the auxiliary popup window. When you locate the right match,
 ;; press RET to finish which hides the auxiliary window and exits
-;; navigation mode. You can resume the search using `M-,'. To abort
+;; navigation mode. You can continue the search using `M-,'. To abort
 ;; the search press `M-*'.
 ;;
 ;; Normally after a few searches a dozen buffers are created visiting
@@ -353,11 +353,12 @@ properly update `ggtags-mode-map'."
     (ggtags-with-ctags-maybe
      (compilation-start command 'ggtags-global-mode))))
 
-(defun ggtags-find-tag-resume ()
+(defun ggtags-find-tag-continue ()
   (interactive)
   (ggtags-ensure-global-buffer
     (ggtags-navigation-mode +1)
     (let ((split-window-preferred-function ggtags-split-window-function))
+      (compilation-next-error 1)
       (compile-goto-error))))
 
 (defun ggtags-find-tag (cmd name)
@@ -720,7 +721,7 @@ Global and Emacs."
   (ggtags-navigation-mode -1)
   (setq ggtags-current-mark nil)
   (setq tags-loop-scan t
-        tags-loop-operate '(ggtags-find-tag-resume))
+        tags-loop-operate '(ggtags-find-tag-continue))
   (ggtags-navigation-mode-cleanup))
 
 (defun ggtags-navigation-mode-abort ()
@@ -872,8 +873,8 @@ Global and Emacs."
       '(menu-item "Find other symbol" ggtags-find-other-symbol))
     (define-key menu [find-reference]
       '(menu-item "Find reference" ggtags-find-reference))
-    (define-key menu [find-tag-resume]
-      '(menu-item "Resume find tag" tags-loop-continue))
+    (define-key menu [find-tag-continue]
+      '(menu-item "Continue find tag" tags-loop-continue))
     (define-key menu [find-tag-regexp]
       '(menu-item "Find tag matching regexp" ggtags-find-tag-regexp))
     (define-key menu [find-tag]
