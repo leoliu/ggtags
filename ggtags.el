@@ -480,6 +480,24 @@ Global and Emacs."
           (when (window-live-p win)
             (quit-window t win)))))))
 
+(defun ggtags-browse-file-as-hypertext (file)
+  "Browse FILE in hypertext (HTML) form."
+  (interactive (list (if (or current-prefix-arg (not buffer-file-name))
+                         (read-file-name "Browse file: " nil nil t)
+                       buffer-file-name)))
+  (or (and file (file-exists-p file)) (error "File `%s' doesn't exist" file))
+  (ggtags-check-project)
+  (or (file-exists-p (expand-file-name "HTML" (ggtags-current-project-root)))
+      (if (yes-or-no-p "No hypertext form exists; run htags? ")
+          (let ((default-directory (ggtags-current-project-root)))
+            (ggtags-with-ctags-maybe (ggtags-process-string "htags")))
+        (user-error "Aborted")))
+  (let ((url (ggtags-process-string
+              "gozilla" "-p" (format "+%d" (line-number-at-pos)) file)))
+    (when (called-interactively-p 'interactive)
+      (message "Browsing %s" url))
+    (browse-url url)))
+
 (defvar ggtags-current-mark nil)
 
 (defun ggtags-next-mark (&optional arg)
@@ -802,6 +820,7 @@ Global and Emacs."
     (define-key m "\M-s" 'ggtags-find-other-symbol)
     (define-key m "\M-g" 'ggtags-grep)
     (define-key m "\M-i" 'ggtags-idutils-query)
+    (define-key m "\M-b" 'ggtags-browse-file-as-hypertext)
     (define-key m "\M-k" 'ggtags-kill-file-buffers)
     (define-key m (kbd "M-%") 'ggtags-query-replace)
     m))
@@ -826,6 +845,9 @@ Global and Emacs."
       '(menu-item "Customize Ggtags"
                   (lambda () (interactive) (customize-group 'ggtags))))
     (define-key menu [sep2] menu-bar-separator)
+    (define-key menu [browse-hypertext]
+      '(menu-item "Browse as hypertext" ggtags-browse-file-as-hypertext
+                  :enable (ggtags-find-project)))
     (define-key menu [delete-tags]
       '(menu-item "Delete tag files" ggtags-delete-tag-files
                   :enable (ggtags-find-project)))
