@@ -133,14 +133,29 @@ If an integer abbreviate only names longer than that number."
   "Key binding used for `ggtags-mode-prefix-map'.
 Users should change the value using `customize-variable' to
 properly update `ggtags-mode-map'."
-  ;; Set later or initialisation will fail.
-  ;; :set 'ggtags-mode-update-prefix-key
+  :set (lambda (sym value)
+         (when (bound-and-true-p ggtags-mode-map)
+           (let ((old (and (boundp sym) (symbol-value sym))))
+             (and old (define-key ggtags-mode-map old nil)))
+           (and value
+                (bound-and-true-p ggtags-mode-prefix-map)
+                (define-key ggtags-mode-map value ggtags-mode-prefix-map)))
+         (set-default sym value))
   :type 'key-sequence
   :group 'ggtags)
 
 (defcustom ggtags-completing-read-function completing-read-function
   "Ggtags specific `completing-read-function' (which see)."
   :type 'function
+  :group 'ggtags)
+
+(defcustom ggtags-highlight-tag-delay 0.25
+  "Time in seconds before highlighting tag at point."
+  :set (lambda (sym value)
+         (when (bound-and-true-p ggtags-highlight-tag-timer)
+           (timer-set-idle-time ggtags-highlight-tag-timer value))
+         (set-default sym value))
+  :type 'float
   :group 'ggtags)
 
 (defcustom ggtags-bounds-of-tag-function (lambda ()
@@ -887,17 +902,6 @@ Global and Emacs."
                   :visible (not (ggtags-find-project))))
     map))
 
-(defun ggtags-mode-update-prefix-key (symbol value)
-  (let ((old (and (boundp symbol) (symbol-value symbol))))
-    (and old (define-key ggtags-mode-map old nil)))
-  (when value
-    (define-key ggtags-mode-map value ggtags-mode-prefix-map))
-  (set-default symbol value))
-
-;; Set here to avoid initialisation problem for
-;; `ggtags-mode-prefix-key'.
-(put 'ggtags-mode-prefix-key 'custom-set #'ggtags-mode-update-prefix-key)
-
 ;;;###autoload
 (define-minor-mode ggtags-mode nil
   :lighter (:eval (if ggtags-navigation-mode "" " GG"))
@@ -992,7 +996,8 @@ Global and Emacs."
   (cancel-timer ggtags-highlight-tag-timer))
 
 (setq ggtags-highlight-tag-timer
-      (run-with-idle-timer 0.2 t 'ggtags-highlight-tag-at-point))
+      (run-with-idle-timer
+       ggtags-highlight-tag-delay t 'ggtags-highlight-tag-at-point))
 
 ;; Higher priority for `ggtags-navigation-mode' to avoid being
 ;; hijacked by modes such as `view-mode'.
