@@ -357,6 +357,9 @@ properly update `ggtags-mode-map'."
 ;; takes three values: nil, t and a marker
 (defvar ggtags-global-start-marker nil)
 
+(defvar ggtags-global-exit-status 0)
+(defvar ggtags-global-match-count 0)
+
 (defun ggtags-global-save-start-marker ()
   (when (markerp ggtags-global-start-marker)
     (eval-and-compile (require 'etags))
@@ -368,6 +371,8 @@ properly update `ggtags-mode-map'."
          (split-window-preferred-function ggtags-split-window-function))
     (setq ggtags-global-start-marker (point-marker))
     (ggtags-navigation-mode +1)
+    (setq ggtags-global-exit-status 0
+          ggtags-global-match-count 0)
     (ggtags-with-ctags-maybe
      (compilation-start command 'ggtags-global-mode))))
 
@@ -551,8 +556,6 @@ Global and Emacs."
   (interactive)
   (ggtags-next-mark 'previous))
 
-(defvar-local ggtags-global-exit-status nil)
-
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (setq ggtags-global-exit-status exit-status)
   (let ((count (save-excursion
@@ -560,6 +563,7 @@ Global and Emacs."
                  (if (re-search-backward "^\\([0-9]+\\) \\w+ located" nil t)
                      (string-to-number (match-string 1))
                    0))))
+    (setq ggtags-global-match-count count)
     ;; Clear the start marker in case of zero matches.
     (and (zerop count) (setq ggtags-global-start-marker nil))
     (cons (if (> exit-status 0)
@@ -786,7 +790,22 @@ Global and Emacs."
     (visible-mode arg)))
 
 (define-minor-mode ggtags-navigation-mode nil
-  :lighter (" GG[" (:propertize "n" face error) "]")
+  :lighter
+  (" GG[" (:eval (ggtags-ensure-global-buffer
+                   (let ((index (when (get-text-property (line-beginning-position)
+                                                         'compilation-message)
+                                  ;; Assume the first match appears at line 5
+                                  (- (line-number-at-pos) 4))))
+                     `((:propertize ,(if index
+                                         (number-to-string (max index 0))
+                                       "?") face success) "/"))))
+   (:propertize (:eval (number-to-string ggtags-global-match-count))
+                face success)
+   (:eval
+    (unless (zerop ggtags-global-exit-status)
+      `(":" (:propertize ,(number-to-string ggtags-global-exit-status)
+                         face error))))
+   "]")
   :global t
   (if ggtags-navigation-mode
       (progn
