@@ -1031,5 +1031,14 @@ Global and Emacs."
 
 (add-to-list 'emulation-mode-map-alists 'ggtags-mode-map-alist)
 
+(defun ggtags-reload (&optional force)
+  (interactive "P")
+  (unload-feature 'ggtags force)
+  (require 'ggtags))
+
+(defun ggtags-unload-function ()
+  (setq emulation-mode-map-alists
+        (delq 'ggtags-mode-map-alist emulation-mode-map-alists)))
+
 (provide 'ggtags)
 ;;; ggtags.el ends here
