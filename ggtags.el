@@ -174,6 +174,8 @@ properly update `ggtags-mode-map'."
 
 (defvar ggtags-bug-url "https://github.com/leoliu/ggtags/issues")
 
+(defvar ggtags-global-last-buffer nil)
+
 (defvar ggtags-current-tag-name nil)
 
 ;; Used by ggtags-global-mode
@@ -188,18 +190,18 @@ properly update `ggtags-mode-map'."
   "Non-nil if `global' supports --path-style switch.")
 
 ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
-(defvar ggtags-global-has-color         ; introduced in global 6.2.9
+(defvar ggtags-global-has-color
   (with-demoted-errors
     (zerop (process-file "global" nil nil nil "--color" "--help"))))
 
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
   `(progn
-     (or (and (buffer-live-p compilation-last-buffer)
-              (with-current-buffer compilation-last-buffer
+     (or (and (buffer-live-p ggtags-global-last-buffer)
+              (with-current-buffer ggtags-global-last-buffer
                 (derived-mode-p 'ggtags-global-mode)))
          (error "No global buffer found"))
-     (with-current-buffer compilation-last-buffer ,@body)))
+     (with-current-buffer ggtags-global-last-buffer ,@body)))
 
 (defmacro ggtags-with-ctags-maybe (&rest body)
   `(let ((process-environment
@@ -379,7 +381,8 @@ properly update `ggtags-mode-map'."
     (setq ggtags-global-exit-status 0
           ggtags-global-match-count 0)
     (ggtags-with-ctags-maybe
-     (compilation-start command 'ggtags-global-mode))))
+     (setq ggtags-global-last-buffer
+           (compilation-start command 'ggtags-global-mode)))))
 
 (defun ggtags-find-tag-continue ()
   (interactive)
@@ -736,7 +739,7 @@ Global and Emacs."
       (goto-char orig))))
 
 (defun ggtags-navigation-mode-cleanup (&optional buf time)
-  (let ((buf (or buf compilation-last-buffer)))
+  (let ((buf (or buf ggtags-global-last-buffer)))
     (and (buffer-live-p buf)
          (with-current-buffer buf
            (when (get-buffer-process (current-buffer))
