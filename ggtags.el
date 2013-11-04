@@ -53,7 +53,10 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl))
+(eval-when-compile
+  (require 'cl)
+  (require 'url-parse))
+
 (require 'compile)
 
 (eval-when-compile
@@ -510,6 +513,9 @@ Global and Emacs."
         (user-error "Aborted")))
   (let ((url (ggtags-process-string
               "gozilla" "-p" (format "+%d" (line-number-at-pos)) file)))
+    (or (equal (file-name-extension
+                (url-filename (url-generic-parse-url url))) "html")
+        (user-error "No hypertext form for `%s'" file))
     (when (called-interactively-p 'interactive)
       (message "Browsing %s" url))
     (browse-url url)))
