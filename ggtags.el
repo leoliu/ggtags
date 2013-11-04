@@ -161,9 +161,9 @@ properly update `ggtags-mode-map'."
   "Time in seconds before highlighting tag at point."
   :set (lambda (sym value)
          (when (bound-and-true-p ggtags-highlight-tag-timer)
-           (timer-set-idle-time ggtags-highlight-tag-timer value))
+           (timer-set-idle-time ggtags-highlight-tag-timer value t))
          (set-default sym value))
-  :type 'float
+  :type 'number
   :group 'ggtags)
 
 (defcustom ggtags-bounds-of-tag-function (lambda ()
@@ -870,9 +870,6 @@ Global and Emacs."
                (ggtags-project-oversize-p (ggtags-find-project)))
       (ggtags-update-tags 'single-update))))
 
-(defvar ggtags-tag-overlay nil)
-(defvar ggtags-highlight-tag-timer nil)
-
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
     (define-key m (kbd "M-DEL") 'ggtags-delete-tag-files)
@@ -947,6 +944,9 @@ Global and Emacs."
                   :visible (not (ggtags-find-project))))
     map))
 
+(defvar ggtags-highlight-tag-overlay nil)
+(defvar ggtags-highlight-tag-timer nil)
+
 ;;;###autoload
 (define-minor-mode ggtags-mode nil
   :lighter (:eval (if ggtags-navigation-mode "" " GG"))
@@ -956,34 +956,51 @@ Global and Emacs."
         (or (executable-find "global")
             (message "Failed to find GNU Global")))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
-    (and (overlayp ggtags-tag-overlay)
-         (delete-overlay ggtags-tag-overlay))
-    (setq ggtags-tag-overlay nil)))
+    (and (overlayp ggtags-highlight-tag-overlay)
+         (delete-overlay ggtags-highlight-tag-overlay))
+    (setq ggtags-highlight-tag-overlay nil)))
+
+(defvar ggtags-highlight-tag-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [S-down-mouse-1] 'ggtags-find-tag-dwim)
+    (define-key map [S-down-mouse-3] 'ggtags-find-reference)
+    map)
+  "Keymap used for valid tag at point.")
+
+(put 'ggtags-active-tag 'face 'ggtags-highlight)
+(put 'ggtags-active-tag 'keymap ggtags-highlight-tag-map)
+;; (put 'ggtags-active-tag 'mouse-face 'match)
+(put 'ggtags-active-tag 'modification-hooks
+     (list (lambda (o after &rest _args)
+             (and (not after) (delete-overlay o)))))
+(put 'ggtags-active-tag 'help-echo
+     "S-down-mouse-1 for defintions\nS-down-mouse-3 for references")
 
 (defun ggtags-highlight-tag-at-point ()
   (when ggtags-mode
-    (unless (overlayp ggtags-tag-overlay)
-      (setq ggtags-tag-overlay (make-overlay (point) (point)))
-      (overlay-put ggtags-tag-overlay 'ggtags t))
-    (let* ((bounds (funcall ggtags-bounds-of-tag-function))
-           (valid-tag (when bounds
-                        (test-completion
-                         (buffer-substring (car bounds) (cdr bounds))
-                         ggtags-completion-table)))
-           (o ggtags-tag-overlay)
-           (done-p (lambda ()
-                     (and (memq o (overlays-at (car bounds)))
-                          (= (overlay-start o) (car bounds))
-                          (= (overlay-end o) (cdr bounds))
-                          (or (and valid-tag (overlay-get o 'face))
-                              (and (not valid-tag) (not (overlay-get o 'face))))))))
+    (unless (overlayp ggtags-highlight-tag-overlay)
+      (let ((o (make-overlay (point) (point) nil t)))
+        (setq ggtags-highlight-tag-overlay o)))
+    (let ((bounds (funcall ggtags-bounds-of-tag-function))
+          (o ggtags-highlight-tag-overlay))
       (cond
-       ((not bounds)
-        (overlay-put ggtags-tag-overlay 'face nil)
-        (move-overlay ggtags-tag-overlay (point) (point) (current-buffer)))
-       ((not (funcall done-p))
+       ((and bounds
+             (overlay-get o 'category)
+             (eq (overlay-buffer o) (current-buffer))
+             (= (overlay-start o) (car bounds))
+             (= (overlay-end o) (cdr bounds)))
+        ;; Tag is already highlighted so do nothing.
+        nil)
+       ((and bounds (test-completion
+                     (buffer-substring (car bounds) (cdr bounds))
+                     ggtags-completion-table))
         (move-overlay o (car bounds) (cdr bounds) (current-buffer))
-        (overlay-put o 'face (and valid-tag 'ggtags-highlight)))))))
+        (overlay-put o 'category 'ggtags-active-tag))
+       (t (move-overlay o
+                        (or (car bounds) (point))
+                        (or (cdr bounds) (point))
+                        (current-buffer))
+          (overlay-put o 'category nil))))))
 
 ;;; imenu
 
