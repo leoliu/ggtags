@@ -79,7 +79,12 @@
   :group 'tools)
 
 (defface ggtags-highlight '((t (:underline t)))
-  "Face used to highlight a valid tag at point.")
+  "Face used to highlight a valid tag at point."
+  :group 'ggtags)
+
+(defface ggtags-global-line '((t (:inherit secondary-selection)))
+  "Face used to highlight matched line in Global buffer."
+  :group 'ggtags)
 
 (defcustom ggtags-auto-jump-to-first-match t
   "Non-nil to automatically jump to the first match."
@@ -378,10 +383,10 @@ properly update `ggtags-mode-map'."
 
 (defun ggtags-find-tag-continue ()
   (interactive)
+  (ggtags-navigation-mode +1)
   (ggtags-ensure-global-buffer
-    (ggtags-navigation-mode +1)
     (let ((split-window-preferred-function ggtags-split-window-function))
-      (compilation-next-error 1)
+      (ignore-errors (compilation-next-error 1))
       (compile-goto-error))))
 
 (defun ggtags-find-tag (cmd name)
@@ -668,7 +673,7 @@ Global and Emacs."
   (jit-lock-register #'ggtags-abbreviate-files)
   (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
   (add-hook 'compilation-finish-functions 'ggtags-handle-single-match nil t)
-  (define-key ggtags-global-mode-map "o" 'visible-mode))
+  (define-key ggtags-global-mode-map "\M-o" 'visible-mode))
 
 ;; NOTE: Need this to avoid putting menu items in
 ;; `emulation-mode-map-alists', which creates double entries. See
@@ -789,6 +794,20 @@ Global and Emacs."
   (ggtags-ensure-global-buffer
     (visible-mode arg)))
 
+(defvar ggtags-global-line-overlay nil)
+
+(defun ggtags-global-next-error-hook ()
+  (ggtags-move-to-tag)
+  (ggtags-global-save-start-marker)
+  (ignore-errors
+    (ggtags-ensure-global-buffer
+      (unless (overlayp ggtags-global-line-overlay)
+        (setq ggtags-global-line-overlay (make-overlay (point) (point)))
+        (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
+      (move-overlay ggtags-global-line-overlay
+                    (line-beginning-position) (line-end-position)
+                    (current-buffer)))))
+
 (define-minor-mode ggtags-navigation-mode nil
   :lighter
   (" GG[" (:eval (ggtags-ensure-global-buffer
@@ -809,14 +828,12 @@ Global and Emacs."
   :global t
   (if ggtags-navigation-mode
       (progn
-        (add-hook 'next-error-hook 'ggtags-move-to-tag)
-        (add-hook 'next-error-hook 'ggtags-global-save-start-marker)
+        (add-hook 'next-error-hook 'ggtags-global-next-error-hook)
         (add-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function))
     ;; Call `ggtags-global-save-start-marker' in case of exiting from
     ;; `ggtags-handle-single-match' for single match.
     (ggtags-global-save-start-marker)
-    (remove-hook 'next-error-hook 'ggtags-global-save-start-marker)
-    (remove-hook 'next-error-hook 'ggtags-move-to-tag)
+    (remove-hook 'next-error-hook 'ggtags-global-next-error-hook)
     (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function)))
 
 (defun ggtags-minibuffer-setup-function ()
