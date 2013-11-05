@@ -270,22 +270,23 @@ properly update `ggtags-mode-map'."
 
 (defun ggtags-make-project (root)
   (check-type root string)
-  (let* ((root (file-truename (file-name-as-directory root)))
-         (has-rtags (> (length
-                        (split-string (let ((default-directory root))
-                                        (shell-command-to-string
-                                         "gtags -d GRTAGS | head -10"))
-                                      "\n" t))
-                       4))
+  (let* ((default-directory (file-truename (file-name-as-directory root)))
+         (rtags-size (nth 7 (file-attributes "GRTAGS")))
+         (has-rtags (when (and rtags-size (< rtags-size (* 32 1024 1024)))
+                      (with-demoted-errors
+                        (> (length
+                            (split-string
+                             (ggtags-process-string "gtags" "-d" "GRTAGS")
+                             "\n" t))
+                           4))))
          (oversize-p (pcase ggtags-oversize-limit
                        (`nil nil)
                        (`t t)
-                       (t (> (or (nth 7 (file-attributes
-                                         (expand-file-name "GTAGS" root)))
-                                 0)
+                       (t (> (or (nth 7 (file-attributes "GTAGS")) 0)
                              ggtags-oversize-limit)))))
-    (puthash root (ggtags-project--make
-                   :root root :has-rtags has-rtags :oversize-p oversize-p)
+    (puthash default-directory (ggtags-project--make
+                                :root default-directory :has-rtags has-rtags
+                                :oversize-p oversize-p)
              ggtags-projects)))
 
 (defvar-local ggtags-project nil)
