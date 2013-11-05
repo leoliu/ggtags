@@ -150,6 +150,12 @@ If an integer abbreviate only names longer than that number."
   :type 'boolean
   :group 'ggtags)
 
+(defcustom ggtags-global-treat-text nil
+  "Non-nil if Global should include matches from text files."
+  :safe 'booleanp
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-mode-prefix-key "\C-c"
   "Key binding used for `ggtags-mode-prefix-map'.
 Users should change the value using `customize-variable' to
@@ -407,6 +413,7 @@ properly update `ggtags-mode-map'."
                           (and ggtags-global-has-color "--color")
                           (and ggtags-global-has-path-style
                                "--path-style=shorter")
+                          (and ggtags-global-treat-text "--other")
                           (pcase cmd
                             ((pred stringp) cmd)
                             (`definition "-d")
