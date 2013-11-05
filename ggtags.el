@@ -403,7 +403,8 @@ If point is at a definition tag, find references, and vice versa.
 With a prefix arg (non-nil DEFINITION) always find defintions."
   (interactive (list (ggtags-read-tag) current-prefix-arg))
   (if (or definition
-          (ggtags-current-project-root)
+          (and (ggtags-find-project)
+               (ggtags-project-ctags-p (ggtags-find-project)))
           (not buffer-file-name))
       (ggtags-find-tag 'definition name)
     (ggtags-find-tag (format "--from-here=%d:%s"
