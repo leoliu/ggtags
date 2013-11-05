@@ -232,14 +232,6 @@ properly update `ggtags-mode-map'."
                        (list "GTAGSLABEL=ctags")))))
      ,@body))
 
-(defmacro ggtags-with-ctags-maybe (&rest body) ; XXX: remove
-  `(let ((process-environment
-          (if (and (ggtags-find-project)
-                   (ggtags-project-ctags-p (ggtags-find-project)))
-              (cons "GTAGSLABEL=ctags" process-environment)
-            process-environment)))
-     ,@body))
-
 (defun ggtags-list-of-string-p (xs)
   "Return non-nil if XS is a list of strings."
   (if (null xs)
@@ -321,7 +313,7 @@ properly update `ggtags-mode-map'."
   (let* ((default-directory (ggtags-current-project-root))
          ;; Not using `ggtags-with-process-environment' to preserve
          ;; environment variables that may be present in
-         ;; ggtags-process-environment.
+         ;; `ggtags-process-environment'.
          (process-environment
           (append ggtags-process-environment
                   process-environment
@@ -466,9 +458,9 @@ If point is at a definition tag, find references, and vice versa.
 With a prefix arg (non-nil DEFINITION) always find defintions."
   (interactive (list (ggtags-read-tag) current-prefix-arg))
   (if (or definition
+          (not buffer-file-name)
           (and (ggtags-find-project)
-               (not (ggtags-project-has-rtags (ggtags-find-project))))
-          (not buffer-file-name))
+               (not (ggtags-project-has-rtags (ggtags-find-project)))))
       (ggtags-find-tag 'definition name)
     (ggtags-find-tag (format "--from-here=%d:%s"
                              (line-number-at-pos)
