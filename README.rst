@@ -13,14 +13,19 @@ Patches, feature requests and bug reports are welcome. Thanks.
 Features
 ~~~~~~~~
 
-#. Automatically run ``global -u`` when needed
-#. Highlight valid tag at point
-#. Built on top of ``compile.el`` (asynchonrous and other nice
-   features)
+#. Automatically update Global's tag files when needed with tuning for
+   large source trees.
+#. Build on ``compile.el`` for asynchrony and its large feature-set.
+#. Intuitive navigation among multiple matches with mode-line display
+   of current match, total matches and exit status.
+#. Manage Global's environment variables on a per-project basis.
+#. Support all Global search backends: ``grep``, ``idutils`` etc.
+#. Query replace.
+#. Highlight tag at point.
+#. Abbreviated display of file names.
 #. Support `exuberant ctags <http://ctags.sourceforge.net/>`_ backend.
-#. Support all  output formats  of ``global``:  ``grep``, ``ctags-x``,
+#. Support all Global's output formats: ``grep``, ``ctags-x``,
    ``cscope`` etc.
-#. Abbreviated display of file names
 
 Why GNU Global
 ~~~~~~~~~~~~~~
@@ -32,9 +37,9 @@ between a few tools.
 Screenshot
 ~~~~~~~~~~
 
-.. figure:: http://i.imgur.com/d430rmm.png
+.. figure:: http://i.imgur.com/lwED3aD.png
    :width: 500px
-   :target: http://i.imgur.com/d430rmm.png
+   :target: http://i.imgur.com/lwED3aD.png
    :alt: ggtags.png
 
 Config
