@@ -272,13 +272,14 @@ properly update `ggtags-mode-map'."
   (check-type root string)
   (let* ((default-directory (file-truename (file-name-as-directory root)))
          (rtags-size (nth 7 (file-attributes "GRTAGS")))
-         (has-rtags (when (and rtags-size (< rtags-size (* 32 1024 1024)))
-                      (with-demoted-errors
-                        (> (length
-                            (split-string
-                             (ggtags-process-string "gtags" "-d" "GRTAGS")
-                             "\n" t))
-                           4))))
+         (has-rtags (when rtags-size
+                      (or (> rtags-size (* 32 1024))
+                          (with-demoted-errors
+                            (> (length
+                                (split-string
+                                 (ggtags-process-string "gtags" "-d" "GRTAGS")
+                                 "\n" t))
+                               4)))))
          (oversize-p (pcase ggtags-oversize-limit
                        (`nil nil)
                        (`t t)
