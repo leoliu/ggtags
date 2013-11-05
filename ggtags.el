@@ -86,6 +86,26 @@
   "Face used to highlight matched line in Global buffer."
   :group 'ggtags)
 
+(defcustom ggtags-oversize-limit (* 50 1024 1024)
+  "The over size limit for the  GTAGS file.
+For large source trees, running 'global -u' can be expensive.
+Thus when GTAGS file is larger than this limit, ggtags
+automatically switches to 'global --single-update'."
+  :safe 'numberp
+  :type '(choice (const :tag "None" nil)
+                 (const :tag "Always" t)
+                 number)
+  :group 'ggtags)
+
+(defcustom ggtags-process-environment nil
+  "Similar to `process-environment' with higher precedence.
+Elements are run through `substitute-env-vars' before use.
+This is intended for project-wise ggtags-specific process
+environment settings."
+  :safe 'ggtags-list-of-string-p
+  :type '(repeat string)
+  :group 'ggtags)
+
 (defcustom ggtags-auto-jump-to-first-match t
   "Non-nil to automatically jump to the first match."
   :type 'boolean
@@ -103,13 +123,6 @@ If an integer abbreviate only names longer than that number."
   :type '(choice (const :tag "No" nil)
                  (const :tag "Always" t)
                  integer)
-  :group 'ggtags)
-
-(defcustom ggtags-oversize-limit (* 50 1024 1024)
-  "The over size limit for the  GTAGS file."
-  :type '(choice (const :tag "None" nil)
-                 (const :tag "Always" t)
-                 number)
   :group 'ggtags)
 
 (defcustom ggtags-split-window-function split-window-preferred-function
@@ -203,13 +216,30 @@ properly update `ggtags-mode-map'."
          (error "No global buffer found"))
      (with-current-buffer ggtags-global-last-buffer ,@body)))
 
-(defmacro ggtags-with-ctags-maybe (&rest body)
+(defmacro ggtags-with-process-environment (&rest body)
+  (declare (debug t))
+  `(let ((process-environment
+          (append (mapcar #'substitute-env-vars ggtags-process-environment)
+                  process-environment
+                  (and (ggtags-find-project)
+                       (not (ggtags-project-has-rtags (ggtags-find-project)))
+                       (list "GTAGSLABEL=ctags")))))
+     ,@body))
+
+(defmacro ggtags-with-ctags-maybe (&rest body) ; XXX: remove
   `(let ((process-environment
           (if (and (ggtags-find-project)
                    (ggtags-project-ctags-p (ggtags-find-project)))
               (cons "GTAGSLABEL=ctags" process-environment)
             process-environment)))
      ,@body))
+
+(defun ggtags-list-of-string-p (xs)
+  "Return non-nil if XS is a list of strings."
+  (if (null xs)
+      t
+    (and (stringp (car xs))
+         (ggtags-list-of-string-p (cdr xs)))))
 
 (defun ggtags-get-libpath ()
   (split-string (or (getenv "GTAGSLIBPATH") "")
@@ -238,18 +268,17 @@ properly update `ggtags-mode-map'."
                            (:copier nil)
                            (:type vector)
                            :named)
-  root dirty-p ctags-p oversize-p)
+  root dirty-p has-rtags oversize-p)
 
-(defun ggtags-make-project (root &optional ctags-p)
+(defun ggtags-make-project (root)
   (check-type root string)
   (let* ((root (file-truename (file-name-as-directory root)))
-         (ctags-p (or ctags-p
-                      (<= (length
-                           (split-string (let ((default-directory root))
-                                           (shell-command-to-string
-                                            "gtags -d GRTAGS | head -10"))
-                                         "\n" t))
-                          4)))
+         (has-rtags (> (length
+                        (split-string (let ((default-directory root))
+                                        (shell-command-to-string
+                                         "gtags -d GRTAGS | head -10"))
+                                      "\n" t))
+                       4))
          (oversize-p (pcase ggtags-oversize-limit
                        (`nil nil)
                        (`t t)
@@ -258,7 +287,7 @@ properly update `ggtags-mode-map'."
                                  0)
                              ggtags-oversize-limit)))))
     (puthash root (ggtags-project--make
-                   :root root :ctags-p ctags-p :oversize-p oversize-p)
+                   :root root :has-rtags has-rtags :oversize-p oversize-p)
              ggtags-projects)))
 
 (defvar-local ggtags-project nil)
@@ -279,6 +308,32 @@ properly update `ggtags-mode-map'."
 (defun ggtags-check-project ()
   (or (ggtags-find-project) (error "File GTAGS not found")))
 
+(defun ggtags-save-project-settings (&optional confirm)
+  "Save Gnu Global's specific environment variables."
+  (interactive "P")
+  (ggtags-check-project)
+  (let* ((default-directory (ggtags-current-project-root))
+         ;; Not using `ggtags-with-process-environment' to preserve
+         ;; environment variables that may be present in
+         ;; ggtags-process-environment.
+         (process-environment
+          (append ggtags-process-environment
+                  process-environment
+                  (and (not (ggtags-project-has-rtags (ggtags-find-project)))
+                       (list "GTAGSLABEL=ctags"))))
+         (envlist (loop for x in '("GTAGSROOT"
+                                   "GTAGSDBPATH"
+                                   "GTAGSLIBPATH"
+                                   "GTAGSCONF"
+                                   "GTAGSLABEL"
+                                   "MAKEOBJDIRPREFIX"
+                                   "GTAGSTHROUGH"
+                                   "GTAGSBLANKENCODE")
+                        when (getenv x)
+                        collect (concat x "=" (getenv x)))))
+    (add-dir-local-variable nil 'ggtags-process-environment envlist)
+    (unless confirm (save-buffer) (kill-buffer))))
+
 (defun ggtags-ensure-project ()
   (interactive)
   (or (ggtags-find-project)
@@ -286,22 +341,23 @@ properly update `ggtags-mode-map'."
                 (user-error "Aborted"))
         (let ((root (read-directory-name "Directory: " nil nil t)))
           (and (zerop (length root)) (user-error "No directory chosen"))
-          (when (let ((process-environment
-                       (if (and (not (getenv "GTAGSLABEL"))
-                                (yes-or-no-p "Use `ctags' backend? "))
-                           (cons "GTAGSLABEL=ctags" process-environment)
-                         process-environment))
-                      (default-directory (file-name-as-directory root)))
-                  (and (apply #'ggtags-process-string
-                              "gtags" (and ggtags-use-idutils '("--idutils")))
-                       (ggtags-make-project root)
-                       t))
+          (when (ggtags-with-process-environment
+                 (let ((process-environment
+                        (if (and (not (getenv "GTAGSLABEL"))
+                                 (yes-or-no-p "Use `ctags' backend? "))
+                            (cons "GTAGSLABEL=ctags" process-environment)
+                          process-environment))
+                       (default-directory (file-name-as-directory root)))
+                   (and (apply #'ggtags-process-string
+                               "gtags" (and ggtags-use-idutils '("--idutils")))
+                        (ggtags-make-project root)
+                        t)))
             (message "GTAGS generated in `%s'" root))))))
 
 (defun ggtags-update-tags (&optional single-update)
   "Update GNU Global tag database."
   (interactive)
-  (ggtags-with-ctags-maybe
+  (ggtags-with-process-environment
    (if single-update
        (when buffer-file-name
          (process-file "global" nil 0 nil "--single-update"
@@ -320,7 +376,7 @@ properly update `ggtags-mode-map'."
          (unless (equal prefix (car cache))
            (setq cache
                  (cons prefix
-                       (ggtags-with-ctags-maybe
+                       (ggtags-with-process-environment
                         (split-string
                          (apply #'ggtags-process-string
                                 "global"
@@ -380,7 +436,7 @@ properly update `ggtags-mode-map'."
     (ggtags-navigation-mode +1)
     (setq ggtags-global-exit-status 0
           ggtags-global-match-count 0)
-    (ggtags-with-ctags-maybe
+    (ggtags-with-process-environment
      (setq ggtags-global-last-buffer
            (compilation-start command 'ggtags-global-mode)))))
 
@@ -404,7 +460,7 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
   (interactive (list (ggtags-read-tag) current-prefix-arg))
   (if (or definition
           (and (ggtags-find-project)
-               (ggtags-project-ctags-p (ggtags-find-project)))
+               (not (ggtags-project-has-rtags (ggtags-find-project))))
           (not buffer-file-name))
       (ggtags-find-tag 'definition name)
     (ggtags-find-tag (format "--from-here=%d:%s"
@@ -523,7 +579,7 @@ Global and Emacs."
   (or (file-exists-p (expand-file-name "HTML" (ggtags-current-project-root)))
       (if (yes-or-no-p "No hypertext form exists; run htags? ")
           (let ((default-directory (ggtags-current-project-root)))
-            (ggtags-with-ctags-maybe (ggtags-process-string "htags")))
+            (ggtags-with-process-environment (ggtags-process-string "htags")))
         (user-error "Aborted")))
   (let ((url (ggtags-process-string
               "gozilla" "-p" (format "+%d" (line-number-at-pos)) file)))
@@ -695,7 +751,7 @@ Global and Emacs."
     (define-key map "\r" 'ggtags-navigation-mode-done)
     ;; Intercept M-. and M-* keys
     (define-key map [remap pop-tag-mark] 'ggtags-navigation-mode-abort)
-    (define-key map [remap ggtags-find-tag] 'undefined)
+    (define-key map [remap ggtags-find-tag-dwim] 'undefined)
     map))
 
 (defvar ggtags-navigation-mode-map
@@ -903,6 +959,8 @@ Global and Emacs."
     (define-key menu [custom-ggtags]
       '(menu-item "Customize Ggtags"
                   (lambda () (interactive) (customize-group 'ggtags))))
+    (define-key menu [save-project]
+      '(menu-item "Save project settings" ggtags-save-project-settings))
     (define-key menu [sep2] menu-bar-separator)
     (define-key menu [browse-hypertext]
       '(menu-item "Browse as hypertext" ggtags-browse-file-as-hypertext
@@ -1019,7 +1077,7 @@ Global and Emacs."
     (let ((file (file-truename buffer-file-name)))
       (with-temp-buffer
         (when (with-demoted-errors
-                (zerop (ggtags-with-ctags-maybe
+                (zerop (ggtags-with-process-environment
                         (process-file "global" nil t nil "-x" "-f" file))))
           (goto-char (point-min))
           (loop while (re-search-forward
