@@ -15,7 +15,8 @@ Features
 
 #. Automatically update Global's tag files when needed with tuning for
    large source trees.
-#. Build on ``compile.el`` for asynchrony and its large feature-set.
+#. Build on ``compile.el`` for asynchronicity and its large
+   feature-set.
 #. Intuitive navigation among multiple matches with mode-line display
    of current match, total matches and exit status.
 #. Manage Global's environment variables on a per-project basis.

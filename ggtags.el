@@ -240,8 +240,8 @@ properly update `ggtags-mode-map'."
          (ggtags-list-of-string-p (cdr xs)))))
 
 (defun ggtags-get-libpath ()
-  (split-string (or (getenv "GTAGSLIBPATH") "")
-                (regexp-quote path-separator) t))
+  (let ((path (ggtags-with-process-environment (getenv "GTAGSLIBPATH"))))
+    (and path (split-string path (regexp-quote path-separator) t))))
 
 (defun ggtags-process-string (program &rest args)
   (with-temp-buffer
@@ -1049,7 +1049,7 @@ Global and Emacs."
      "S-down-mouse-1 for defintions\nS-down-mouse-3 for references")
 
 (defun ggtags-highlight-tag-at-point ()
-  (when ggtags-mode
+  (when (and ggtags-mode ggtags-project)
     (unless (overlayp ggtags-highlight-tag-overlay)
       (let ((o (make-overlay (point) (point) nil t)))
         (setq ggtags-highlight-tag-overlay o)))
