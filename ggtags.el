@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.1
+;; Version: 0.7.2
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -379,6 +379,7 @@ properly update `ggtags-mode-map'."
                       (split-string
                        (apply #'ggtags-process-string
                               "global"
+                              ;; Note -c alone returns only definitions
                               (if completion-ignore-case
                                   (list "--ignore-case" "-Tc" prefix)
                                 (list "-Tc" prefix)))
@@ -1050,7 +1051,7 @@ Global and Emacs."
      "S-down-mouse-1 for defintions\nS-down-mouse-3 for references")
 
 (defun ggtags-highlight-tag-at-point ()
-  (when (eq ggtags-project 'unset)
+  (when (and ggtags-mode (eq ggtags-project 'unset))
     (ggtags-find-project))
   (when (and ggtags-mode ggtags-project)
     (unless (overlayp ggtags-highlight-tag-overlay)
