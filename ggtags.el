@@ -290,16 +290,17 @@ properly update `ggtags-mode-map'."
                                 :oversize-p oversize-p)
              ggtags-projects)))
 
-(defvar-local ggtags-project nil)
+(defvar-local ggtags-project 'unset)
 
 ;;;###autoload
 (defun ggtags-find-project ()
-  (or ggtags-project
-      (let ((root (ignore-errors (file-name-as-directory
-                                  (ggtags-process-string "global" "-pr")))))
-        (and root (setq ggtags-project
-                        (or (gethash (file-truename root) ggtags-projects)
-                            (ggtags-make-project root)))))))
+  (if (ggtags-project-p ggtags-project)
+      ggtags-project
+    (let ((root (ignore-errors (file-name-as-directory
+                                (ggtags-process-string "global" "-pr")))))
+      (setq ggtags-project
+            (and root (or (gethash (file-truename root) ggtags-projects)
+                          (ggtags-make-project root)))))))
 
 (defun ggtags-current-project-root ()
   (and (ggtags-find-project)
@@ -1049,6 +1050,8 @@ Global and Emacs."
      "S-down-mouse-1 for defintions\nS-down-mouse-3 for references")
 
 (defun ggtags-highlight-tag-at-point ()
+  (when (eq ggtags-project 'unset)
+    (ggtags-find-project))
   (when (and ggtags-mode ggtags-project)
     (unless (overlayp ggtags-highlight-tag-overlay)
       (let ((o (make-overlay (point) (point) nil t)))
@@ -1131,7 +1134,8 @@ Global and Emacs."
 
 (defun ggtags-unload-function ()
   (setq emulation-mode-map-alists
-        (delq 'ggtags-mode-map-alist emulation-mode-map-alists)))
+        (delq 'ggtags-mode-map-alist emulation-mode-map-alists))
+  nil)
 
 (provide 'ggtags)
 ;;; ggtags.el ends here
