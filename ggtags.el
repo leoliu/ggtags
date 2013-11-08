@@ -100,8 +100,9 @@ automatically switches to 'global --single-update'."
 (defcustom ggtags-process-environment nil
   "Similar to `process-environment' with higher precedence.
 Elements are run through `substitute-env-vars' before use.
-This is intended for project-wise ggtags-specific process
-environment settings."
+GTAGSROOT will always be expanded to current project root
+directory. This is intended for project-wise ggtags-specific
+process environment settings."
   :safe 'ggtags-list-of-string-p
   :type '(repeat string)
   :group 'ggtags)
@@ -225,7 +226,9 @@ properly update `ggtags-mode-map'."
 (defmacro ggtags-with-process-environment (&rest body)
   (declare (debug t))
   `(let ((process-environment
-          (append (mapcar #'substitute-env-vars ggtags-process-environment)
+          (append (let ((process-environment process-environment))
+                    (setenv "GTAGSROOT" (ggtags-current-project-root))
+                    (mapcar #'substitute-env-vars ggtags-process-environment))
                   process-environment
                   (and (ggtags-find-project)
                        (not (ggtags-project-has-rtags (ggtags-find-project)))
@@ -457,7 +460,7 @@ properly update `ggtags-mode-map'."
 (defun ggtags-find-tag-dwim (name &optional definition)
   "Find definitions or references of tag NAME by context.
 If point is at a definition tag, find references, and vice versa.
-With a prefix arg (non-nil DEFINITION) always find defintions."
+With a prefix arg (non-nil DEFINITION) always find definitions."
   (interactive (list (ggtags-read-tag) current-prefix-arg))
   (if (or definition
           (not buffer-file-name)
@@ -475,7 +478,7 @@ With a prefix arg (non-nil DEFINITION) always find defintions."
   (ggtags-find-tag 'reference name))
 
 (defun ggtags-find-other-symbol (name)
-  "Find tag NAME wchi is a reference without a definition."
+  "Find tag NAME that is a reference without a definition."
   (interactive (list (ggtags-read-tag)))
   (ggtags-find-tag 'symbol name))
 
@@ -1048,7 +1051,7 @@ Global and Emacs."
      (list (lambda (o after &rest _args)
              (and (not after) (delete-overlay o)))))
 (put 'ggtags-active-tag 'help-echo
-     "S-down-mouse-1 for defintions\nS-down-mouse-3 for references")
+     "S-down-mouse-1 for definitions\nS-down-mouse-3 for references")
 
 (defun ggtags-highlight-tag-at-point ()
   (when (and ggtags-mode (eq ggtags-project 'unset))
