@@ -278,11 +278,8 @@ properly update `ggtags-mode-map'."
          (has-rtags (when rtags-size
                       (or (> rtags-size (* 32 1024))
                           (with-demoted-errors
-                            (> (length
-                                (split-string
-                                 (ggtags-process-string "gtags" "-d" "GRTAGS")
-                                 "\n" t))
-                               4)))))
+                            (not (equal "" (ggtags-process-string "global"
+                                                                  "-crs")))))))
          (oversize-p (pcase ggtags-oversize-limit
                        (`nil nil)
                        (`t t)
@@ -352,10 +349,11 @@ properly update `ggtags-mode-map'."
                             (cons "GTAGSLABEL=ctags" process-environment)
                           process-environment))
                        (default-directory (file-name-as-directory root)))
-                   (and (apply #'ggtags-process-string
-                               "gtags" (and ggtags-use-idutils '("--idutils")))
-                        (ggtags-make-project root)
-                        t)))
+                   (with-temp-message "`gtags' in progress..."
+                     (and (apply #'ggtags-process-string
+                                 "gtags" (and ggtags-use-idutils '("--idutils")))
+                          (ggtags-make-project root)
+                          t))))
             (message "GTAGS generated in `%s'" root))))))
 
 (defun ggtags-update-tags (&optional force)
@@ -945,7 +943,7 @@ Global and Emacs."
     (define-key m (kbd "M-DEL") 'ggtags-delete-tag-files)
     (define-key m "\M-p" 'ggtags-prev-mark)
     (define-key m "\M-n" 'ggtags-next-mark)
-    (define-key m "\M-s" 'ggtags-find-other-symbol)
+    (define-key m "\M-o" 'ggtags-find-other-symbol)
     (define-key m "\M-g" 'ggtags-grep)
     (define-key m "\M-i" 'ggtags-idutils-query)
     (define-key m "\M-b" 'ggtags-browse-file-as-hypertext)
