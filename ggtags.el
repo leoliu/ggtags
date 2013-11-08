@@ -444,8 +444,8 @@ properly update `ggtags-mode-map'."
 
 (defun ggtags-find-tag-continue ()
   (interactive)
-  (ggtags-navigation-mode +1)
   (ggtags-ensure-global-buffer
+    (ggtags-navigation-mode +1)
     (let ((split-window-preferred-function ggtags-split-window-function))
       (ignore-errors (compilation-next-error 1))
       (compile-goto-error))))
@@ -612,7 +612,7 @@ Global and Emacs."
     (let ((i (- (ring-length find-tag-marker-ring)
                 (ring-member find-tag-marker-ring ggtags-current-mark)))
           (message-log-max nil))
-      (message "%d%s marker" i (pcase i
+      (message "%d%s marker" i (pcase (mod i 10)
                                  (1 "st")
                                  (2 "nd")
                                  (3 "rd")
@@ -1070,9 +1070,10 @@ Global and Emacs."
              (= (overlay-end o) (cdr bounds)))
         ;; Tag is already highlighted so do nothing.
         nil)
-       ((and bounds (test-completion
-                     (buffer-substring (car bounds) (cdr bounds))
-                     ggtags-completion-table))
+       ((and bounds (let ((completion-ignore-case nil))
+                      (test-completion
+                       (buffer-substring (car bounds) (cdr bounds))
+                       ggtags-completion-table)))
         (move-overlay o (car bounds) (cdr bounds) (current-buffer))
         (overlay-put o 'category 'ggtags-active-tag))
        (t (move-overlay o
