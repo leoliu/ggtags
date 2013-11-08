@@ -571,11 +571,13 @@ Global and Emacs."
           (when (window-live-p win)
             (quit-window t win)))))))
 
-(defun ggtags-browse-file-as-hypertext (file)
+(defun ggtags-browse-file-as-hypertext (file line)
   "Browse FILE in hypertext (HTML) form."
-  (interactive (list (if (or current-prefix-arg (not buffer-file-name))
-                         (read-file-name "Browse file: " nil nil t)
-                       buffer-file-name)))
+  (interactive (if (or current-prefix-arg (not buffer-file-name))
+                   (list (read-file-name "Browse file: " nil nil t)
+                         (read-number "Line: " 1))
+                 (list buffer-file-name (line-number-at-pos))))
+  (check-type line integer)
   (or (and file (file-exists-p file)) (error "File `%s' doesn't exist" file))
   (ggtags-check-project)
   (or (file-exists-p (expand-file-name "HTML" (ggtags-current-project-root)))
@@ -584,7 +586,7 @@ Global and Emacs."
             (ggtags-with-process-environment (ggtags-process-string "htags")))
         (user-error "Aborted")))
   (let ((url (ggtags-process-string
-              "gozilla" "-p" (format "+%d" (line-number-at-pos)) file)))
+              "gozilla" "-p" (format "+%d" line) file)))
     (or (equal (file-name-extension
                 (url-filename (url-generic-parse-url url))) "html")
         (user-error "No hypertext form for `%s'" file))
