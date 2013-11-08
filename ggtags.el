@@ -198,6 +198,10 @@ properly update `ggtags-mode-map'."
 
 (defvar ggtags-current-tag-name nil)
 
+(defvar ggtags-highlight-tag-overlay nil)
+
+(defvar ggtags-highlight-tag-timer nil)
+
 ;; Used by ggtags-global-mode
 (defvar ggtags-global-error "match"
   "Stem of message to print when no matches are found.")
@@ -273,7 +277,7 @@ properly update `ggtags-mode-map'."
 
 (defun ggtags-make-project (root)
   (check-type root string)
-  (let* ((default-directory (file-truename (file-name-as-directory root)))
+  (let* ((default-directory (file-name-as-directory root))
          (rtags-size (nth 7 (file-attributes "GRTAGS")))
          (has-rtags (when rtags-size
                       (or (> rtags-size (* 32 1024))
@@ -297,9 +301,10 @@ properly update `ggtags-mode-map'."
   (if (ggtags-project-p ggtags-project)
       ggtags-project
     (let ((root (ignore-errors (file-name-as-directory
+                                ;; Resolves symbolic links
                                 (ggtags-process-string "global" "-pr")))))
       (setq ggtags-project
-            (and root (or (gethash (file-truename root) ggtags-projects)
+            (and root (or (gethash root ggtags-projects)
                           (ggtags-make-project root)))))))
 
 (defun ggtags-current-project-root ()
@@ -342,19 +347,18 @@ properly update `ggtags-mode-map'."
                 (user-error "Aborted"))
         (let ((root (read-directory-name "Directory: " nil nil t)))
           (and (zerop (length root)) (user-error "No directory chosen"))
-          (when (ggtags-with-process-environment
-                 (let ((process-environment
-                        (if (and (not (getenv "GTAGSLABEL"))
-                                 (yes-or-no-p "Use `ctags' backend? "))
-                            (cons "GTAGSLABEL=ctags" process-environment)
-                          process-environment))
-                       (default-directory (file-name-as-directory root)))
-                   (with-temp-message "`gtags' in progress..."
-                     (and (apply #'ggtags-process-string
-                                 "gtags" (and ggtags-use-idutils '("--idutils")))
-                          (ggtags-make-project root)
-                          t))))
-            (message "GTAGS generated in `%s'" root))))))
+          (ggtags-with-process-environment
+           (let ((process-environment
+                  (if (and (not (getenv "GTAGSLABEL"))
+                           (yes-or-no-p "Use `ctags' backend? "))
+                      (cons "GTAGSLABEL=ctags" process-environment)
+                    process-environment))
+                 (default-directory (file-name-as-directory root)))
+             (with-temp-message "`gtags' in progress..."
+               (apply #'ggtags-process-string
+                      "gtags" (and ggtags-use-idutils '("--idutils"))))))
+          (message "GTAGS generated in `%s'" root)
+          (ggtags-find-project)))))
 
 (defun ggtags-update-tags (&optional force)
   "Update GNU Global tag database."
@@ -468,7 +472,7 @@ With a prefix arg (non-nil DEFINITION) always find definitions."
     (ggtags-find-tag (format "--from-here=%d:%s"
                              (line-number-at-pos)
                              (shell-quote-argument
-                              (file-truename buffer-file-name)))
+                              (file-relative-name buffer-file-name)))
                      name)))
 
 (defun ggtags-find-reference (name)
@@ -567,6 +571,7 @@ Global and Emacs."
               (when (yes-or-no-p "Remove GNU Global tag files? ")
                 (mapc 'delete-file files)
                 (remhash (ggtags-current-project-root) ggtags-projects)
+                (delete-overlay ggtags-highlight-tag-overlay)
                 (kill-local-variable 'ggtags-project)))
           (when (window-live-p win)
             (quit-window t win)))))))
@@ -924,7 +929,10 @@ Global and Emacs."
                        (not (eq buf (current-buffer)))
                        (buffer-file-name buf))))
         (when (and file (funcall some
-                                 (apply-partially #'file-in-directory-p file)
+                                 (lambda (dir)
+                                   ;; Don't use `file-in-directory-p'
+                                   ;; to allow symbolic links.
+                                   (string-prefix-p dir file))
                                  directories))
           (and (kill-buffer buf) (incf count)))))
     (and interactive
@@ -938,7 +946,7 @@ Global and Emacs."
                (ggtags-project-oversize-p (ggtags-find-project)))
       (ggtags-with-process-environment
        (process-file "global" nil 0 nil "--single-update"
-                     (file-truename buffer-file-name))))))
+                     (file-relative-name buffer-file-name))))))
 
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
@@ -1016,10 +1024,6 @@ Global and Emacs."
                   :visible (not (ggtags-find-project))))
     map))
 
-(defvar ggtags-highlight-tag-overlay nil)
-
-(defvar ggtags-highlight-tag-timer nil)
-
 ;;;###autoload
 (define-minor-mode ggtags-mode nil
   :lighter (:eval (if ggtags-navigation-mode "" " GG"))
@@ -1095,7 +1099,7 @@ Global and Emacs."
 (defun ggtags-build-imenu-index ()
   "A function suitable for `imenu-create-index-function'."
   (when buffer-file-name
-    (let ((file (file-truename buffer-file-name)))
+    (let ((file (file-relative-name buffer-file-name)))
       (with-temp-buffer
         (when (with-demoted-errors
                 (zerop (ggtags-with-process-environment
