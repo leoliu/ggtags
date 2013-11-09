@@ -624,8 +624,7 @@ Global and Emacs."
           (let ((default-directory (ggtags-current-project-root)))
             (ggtags-with-process-environment (ggtags-process-string "htags")))
         (user-error "Aborted")))
-  (let ((url (ggtags-process-string
-              "gozilla" "-p" (format "+%d" line) file)))
+  (let ((url (ggtags-process-string "gozilla" "-p" (format "+%d" line) file)))
     (or (equal (file-name-extension
                 (url-filename (url-generic-parse-url url))) "html")
         (user-error "No hypertext form for `%s'" file))
@@ -767,6 +766,8 @@ Global and Emacs."
 
 (define-compilation-mode ggtags-global-mode "Global"
   "A mode for showing outputs from gnu global."
+  ;; Make it buffer local for `ggtags-abbreviate-files'.
+  (make-local-variable 'ggtags-global-output-format)
   (setq-local compilation-error-regexp-alist
               (list ggtags-global-output-format))
   (setq-local compilation-auto-jump-to-first-error
