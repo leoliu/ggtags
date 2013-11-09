@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.2
+;; Version: 0.7.3
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -438,6 +438,7 @@ properly update `ggtags-mode-map'."
                             (`definition "-d")
                             (`reference "-r")
                             (`symbol "-s")
+                            (`path "--path")
                             (`grep "--grep")
                             (`idutils "--idutils")))
                     args)))
@@ -523,7 +524,7 @@ With a prefix arg (non-nil DEFINITION) always find definitions."
   "Use `global --grep' to search for lines matching PATTERN.
 Invert the match when called with a prefix arg \\[universal-argument]."
   (interactive (list (ggtags-read-string (if current-prefix-arg
-                                             "Grep inverted pattern"
+                                             "Inverted grep pattern"
                                            "Grep pattern"))
                      current-prefix-arg))
   (ggtags-find-tag 'grep (format "%s--regexp %S"
@@ -533,6 +534,16 @@ Invert the match when called with a prefix arg \\[universal-argument]."
 (defun ggtags-idutils-query (pattern)
   (interactive (list (ggtags-read-string "ID query pattern")))
   (ggtags-find-tag 'idutils (format "--regexp %S" pattern)))
+
+(defun ggtags-find-file (pattern &optional invert-match)
+  (interactive (list (ggtags-read-string (if current-prefix-arg
+                                             "Inverted path pattern"
+                                           "Path pattern"))
+                     current-prefix-arg))
+  (let ((ggtags-global-output-format 'path))
+    (ggtags-find-tag 'path (format "%s--regexp %S"
+                                   (if invert-match "--invert-match " "")
+                                   pattern))))
 
 ;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
 (defun ggtags-find-tag-regexp (regexp directory)
@@ -725,6 +736,10 @@ Global and Emacs."
 
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
+  ;; Get rid of line "Using config file '/PATH/TO/.globalrc'."
+  (when (re-search-backward "^ *Using config file '.*\n"
+                            compilation-filter-start t)
+    (replace-match ""))
   (ansi-color-apply-on-region compilation-filter-start (point)))
 
 (defun ggtags-handle-single-match (buf _how)
@@ -976,6 +991,7 @@ Global and Emacs."
     (define-key m (kbd "M-DEL") 'ggtags-delete-tag-files)
     (define-key m "\M-p" 'ggtags-prev-mark)
     (define-key m "\M-n" 'ggtags-next-mark)
+    (define-key m "\M-f" 'ggtags-find-file)
     (define-key m "\M-o" 'ggtags-find-other-symbol)
     (define-key m "\M-g" 'ggtags-grep)
     (define-key m "\M-i" 'ggtags-idutils-query)
@@ -1013,7 +1029,7 @@ Global and Emacs."
       '(menu-item "Delete tag files" ggtags-delete-tag-files
                   :enable (ggtags-find-project)))
     (define-key menu [kill-buffers]
-      '(menu-item "Kill buffers visiting project files" ggtags-kill-file-buffers
+      '(menu-item "Kill project file buffers" ggtags-kill-file-buffers
                   :enable (ggtags-find-project)))
     (define-key menu [pop-mark]
       '(menu-item "Pop mark" pop-tag-mark
@@ -1023,6 +1039,8 @@ Global and Emacs."
     (define-key menu [prev-mark]
       '(menu-item "Previous mark" ggtags-prev-mark))
     (define-key menu [sep1] menu-bar-separator)
+    (define-key menu [find-file]
+      '(menu-item "Find files" ggtags-find-file))
     (define-key menu [query-replace]
       '(menu-item "Query replace" ggtags-query-replace))
     (define-key menu [idutils]
@@ -1031,12 +1049,12 @@ Global and Emacs."
       '(menu-item "Use grep" ggtags-grep))
     (define-key menu [find-symbol]
       '(menu-item "Find other symbol" ggtags-find-other-symbol))
+    (define-key menu [find-tag-regexp]
+      '(menu-item "Find tag matching regexp" ggtags-find-tag-regexp))
     (define-key menu [find-reference]
       '(menu-item "Find reference" ggtags-find-reference))
     (define-key menu [find-tag-continue]
       '(menu-item "Continue find tag" tags-loop-continue))
-    (define-key menu [find-tag-regexp]
-      '(menu-item "Find tag matching regexp" ggtags-find-tag-regexp))
     (define-key menu [find-tag]
       '(menu-item "Find tag" ggtags-find-tag-dwim))
     (define-key menu [update-tags]
