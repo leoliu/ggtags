@@ -239,7 +239,9 @@ properly update `ggtags-mode-map'."
   (declare (debug t))
   `(let ((process-environment
           (append (let ((process-environment process-environment))
-                    (setenv "GTAGSROOT" (ggtags-current-project-root))
+                    (when (ggtags-find-project)
+                      (setenv "GTAGSROOT" (directory-file-name
+                                           (ggtags-current-project-root))))
                     (mapcar #'substitute-env-vars ggtags-process-environment))
                   process-environment
                   (and (ggtags-find-project)
@@ -287,11 +289,11 @@ properly update `ggtags-mode-map'."
   (check-type root string)
   (let* ((default-directory (file-name-as-directory root))
          (rtags-size (nth 7 (file-attributes "GRTAGS")))
-         (has-rtags (when rtags-size
-                      (or (> rtags-size (* 32 1024))
-                          (with-demoted-errors
-                            (not (equal "" (ggtags-process-string "global"
-                                                                  "-crs")))))))
+         (has-rtags
+          (when rtags-size
+            (or (> rtags-size (* 32 1024))
+                (with-demoted-errors
+                  (not (equal "" (ggtags-process-string "global" "-crs")))))))
          (oversize-p (pcase ggtags-oversize-limit
                        (`nil nil)
                        (`t t)
@@ -362,16 +364,17 @@ properly update `ggtags-mode-map'."
   (or (ggtags-find-project)
       (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
                 (user-error "Aborted"))
-        (let ((root (read-directory-name "Directory: " nil nil t)))
+        (let ((root (read-directory-name "Directory: " nil nil t))
+              (process-environment process-environment))
           (and (zerop (length root)) (user-error "No directory chosen"))
+          (setenv "GTAGSROOT"
+                  (directory-file-name (file-name-as-directory root)))
           (ggtags-with-process-environment
-           (let ((process-environment
-                  (if (and (not (getenv "GTAGSLABEL"))
-                           (yes-or-no-p "Use `ctags' backend? "))
-                      (cons "GTAGSLABEL=ctags" process-environment)
-                    process-environment))
-                 (default-directory (file-name-as-directory root)))
-             (with-temp-message "`gtags' in progress..."
+           (and (not (getenv "GTAGSLABEL"))
+                (yes-or-no-p "Use `ctags' backend? ")
+                (setenv "GTAGSLABEL" "ctags"))
+           (with-temp-message "`gtags' in progress..."
+             (let ((default-directory (file-name-as-directory root)))
                (apply #'ggtags-process-string
                       "gtags" (and ggtags-use-idutils '("--idutils"))))))
           (message "GTAGS generated in `%s'" root)
