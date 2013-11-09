@@ -429,9 +429,12 @@ properly update `ggtags-mode-map'."
 (defvar ggtags-global-exit-status 0)
 (defvar ggtags-global-match-count 0)
 
+(defvar ggtags-tag-ring-index nil)
+
 (defun ggtags-global-save-start-marker ()
   (when (markerp ggtags-global-start-marker)
     (eval-and-compile (require 'etags))
+    (setq ggtags-tag-ring-index nil)
     (ring-insert find-tag-marker-ring ggtags-global-start-marker)
     (setq ggtags-global-start-marker t)))
 
@@ -599,31 +602,32 @@ Global and Emacs."
       (message "Browsing %s" url))
     (browse-url url)))
 
-(defvar ggtags-current-mark nil)
-
 (defun ggtags-next-mark (&optional arg)
   "Move to the next (newer) mark in the tag marker ring."
   (interactive)
   (and (zerop (ring-length find-tag-marker-ring))
        (user-error "No %s mark" (if arg "previous" "next")))
-  (let ((mark (or (and ggtags-current-mark
-                       ;; Note `ring-previous' gets newer item.
-                       (funcall (if arg #'ring-next #'ring-previous)
-                                find-tag-marker-ring ggtags-current-mark))
-                  (prog1
-                      (ring-ref find-tag-marker-ring (if arg 0 -1))
-                    (ring-insert find-tag-marker-ring (point-marker))))))
-    (setq ggtags-current-mark mark)
-    (let ((i (- (ring-length find-tag-marker-ring)
-                (ring-member find-tag-marker-ring ggtags-current-mark)))
-          (message-log-max nil))
-      (message "%d%s marker" i (pcase (mod i 10)
+  (setq ggtags-tag-ring-index
+        ;; Note `ring-minus1' gets newer item.
+        (funcall (if arg #'ring-plus1 #'ring-minus1)
+                 (or ggtags-tag-ring-index
+                     (progn
+                       (ring-insert find-tag-marker-ring (point-marker))
+                       0))
+                 (ring-length find-tag-marker-ring)))
+  (let ((m (ring-ref find-tag-marker-ring ggtags-tag-ring-index))
+        (i (- (ring-length find-tag-marker-ring) ggtags-tag-ring-index))
+        (message-log-max nil))
+    (message "%d%s marker%s" i (pcase (mod i 10)
                                  (1 "st")
                                  (2 "nd")
                                  (3 "rd")
-                                 (_ "th"))))
-    (switch-to-buffer (marker-buffer mark))
-    (goto-char mark)))
+                                 (_ "th"))
+             (if (marker-buffer m) "" " (dead)"))
+    (if (not (marker-buffer m))
+        (ding)
+      (switch-to-buffer (marker-buffer m))
+      (goto-char m))))
 
 (defun ggtags-prev-mark ()
   "Move to the previous (older) mark in the tag marker ring."
@@ -825,7 +829,6 @@ Global and Emacs."
 (defun ggtags-navigation-mode-done ()
   (interactive)
   (ggtags-navigation-mode -1)
-  (setq ggtags-current-mark nil)
   (setq tags-loop-scan t
         tags-loop-operate '(ggtags-find-tag-continue))
   (ggtags-navigation-mode-cleanup))
