@@ -90,11 +90,19 @@
   "The over size limit for the  GTAGS file.
 For large source trees, running 'global -u' can be expensive.
 Thus when GTAGS file is larger than this limit, ggtags
-automatically switches to 'global --single-update'."
+automatically switches to 'global --single-update'.
+
+Change is effective when a project's information is renewed.
+See also `ggtags-project-duration'."
   :safe 'numberp
   :type '(choice (const :tag "None" nil)
                  (const :tag "Always" t)
                  number)
+  :group 'ggtags)
+
+(defcustom ggtags-project-duration 3600
+  "Seconds to keep information of a project in memory."
+  :type 'number
   :group 'ggtags)
 
 (defcustom ggtags-process-environment nil
@@ -273,7 +281,7 @@ properly update `ggtags-mode-map'."
                            (:copier nil)
                            (:type vector)
                            :named)
-  root dirty-p has-rtags oversize-p)
+  root dirty-p has-rtags oversize-p timestamp)
 
 (defun ggtags-make-project (root)
   (check-type root string)
@@ -291,15 +299,24 @@ properly update `ggtags-mode-map'."
                              ggtags-oversize-limit)))))
     (puthash default-directory (ggtags-project--make
                                 :root default-directory :has-rtags has-rtags
-                                :oversize-p oversize-p)
+                                :oversize-p oversize-p :timestamp (float-time))
              ggtags-projects)))
 
 (defvar-local ggtags-project 'unset)
 
+(defun ggtags-project-expired-p (project)
+  (> (- (float-time)
+        (ggtags-project-timestamp project))
+     ggtags-project-duration))
+
 ;;;###autoload
 (defun ggtags-find-project ()
   (if (ggtags-project-p ggtags-project)
-      ggtags-project
+      (if (not (ggtags-project-expired-p ggtags-project))
+          ggtags-project
+        (remhash (ggtags-project-root ggtags-project) ggtags-projects)
+        (kill-local-variable 'ggtags-project)
+        (ggtags-find-project))
     (let ((root (ignore-errors (file-name-as-directory
                                 ;; Resolves symbolic links
                                 (ggtags-process-string "global" "-pr")))))
