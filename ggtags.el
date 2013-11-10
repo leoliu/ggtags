@@ -664,6 +664,72 @@ Global and Emacs."
   (interactive)
   (ggtags-next-mark 'previous))
 
+(defun ggtags-view-tag-history ()
+  (interactive)
+  (let ((split-window-preferred-function ggtags-split-window-function)
+        (inhibit-read-only t))
+    (pop-to-buffer "*Tag Ring*")
+    (erase-buffer)
+    (tabulated-list-mode)
+    (setq tabulated-list-entries
+          ;; Use a function so that revert can work properly.
+          (lambda ()
+            (let ((counter (ring-length find-tag-marker-ring))
+                  (elements (ring-elements find-tag-marker-ring))
+                  (action
+                   (lambda (button) (interactive)
+                     (let ((m (button-get button 'marker)))
+                       (or (markerp m) (user-error "Marker dead"))
+                       (setq ggtags-tag-ring-index
+                             (ring-member find-tag-marker-ring m))
+                       (pop-to-buffer (marker-buffer m))
+                       (goto-char (marker-position m)))))
+                  (get-line
+                   (lambda (m)
+                     (with-current-buffer (marker-buffer m)
+                       (save-excursion
+                         (goto-char m)
+                         (buffer-substring (line-beginning-position)
+                                           (line-end-position)))))))
+              (setq tabulated-list-format
+                    `[("ID" ,(max (1+ (floor (log10 counter))) 2)
+                       (lambda (x y) (< (car x) (car y))))
+                      ("Buffer" ,(max (loop for m in elements
+                                            for b = (marker-buffer m)
+                                            maximize
+                                            (length (and b (buffer-name b))))
+                                      6)
+                       t :right-align t)
+                      ("Position" ,(max (loop for m in elements
+                                              for p = (or (marker-position m) 1)
+                                              maximize (1+ (floor (log10 p))))
+                                        8)
+                       (lambda (x y)
+                         (< (string-to-number (aref (cadr x) 2))
+                            (string-to-number (aref (cadr y) 2))))
+                       :right-align t)
+                      ("Contents" 100 t)])
+              (tabulated-list-init-header)
+              (setq tabulated-list-sort-key '("ID" . t))
+              (mapcar (lambda (x)
+                        (prog1
+                            (list counter
+                                  (if (marker-buffer x)
+                                      (vector (number-to-string counter)
+                                              `(,(buffer-name (marker-buffer x))
+                                                face link
+                                                follow-link t
+                                                marker ,x
+                                                action ,action)
+                                              (number-to-string (marker-position x))
+                                              (funcall get-line x))
+                                    (vector (number-to-string counter)
+                                            "(dead)" "?" "?")))
+                          (decf counter)))
+                      (or elements (user-error "No tags"))))))
+    (tabulated-list-print)
+    (fit-window-to-buffer)))
+
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (setq ggtags-global-exit-status exit-status)
   (let ((count (save-excursion
@@ -998,6 +1064,7 @@ Global and Emacs."
     (define-key m "\M-i" 'ggtags-idutils-query)
     (define-key m "\M-b" 'ggtags-browse-file-as-hypertext)
     (define-key m "\M-k" 'ggtags-kill-file-buffers)
+    (define-key m "\M-h" 'ggtags-view-tag-history)
     (define-key m (kbd "M-%") 'ggtags-query-replace)
     m))
 
@@ -1032,6 +1099,8 @@ Global and Emacs."
     (define-key menu [kill-buffers]
       '(menu-item "Kill project file buffers" ggtags-kill-file-buffers
                   :enable (ggtags-find-project)))
+    (define-key menu [view-tag]
+      '(menu-item "View tag history" ggtags-view-tag-history))
     (define-key menu [pop-mark]
       '(menu-item "Pop mark" pop-tag-mark
                   :help "Pop to previous mark and destroy it"))
