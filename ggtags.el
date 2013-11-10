@@ -390,26 +390,27 @@ properly update `ggtags-mode-map'."
        (ggtags-process-string "global" "-u")
        (setf (ggtags-project-dirty-p (ggtags-find-project)) nil)))))
 
+(defvar-local ggtags-completion-cache nil)
+
 (defvar ggtags-completion-table
-  (let (cache)
-    (completion-table-dynamic
-     (lambda (prefix)
-       (when (and (ggtags-find-project)
-                  (not (ggtags-project-oversize-p (ggtags-find-project))))
-         (ggtags-update-tags))
-       (unless (equal prefix (car cache))
-         (setq cache
-               (cons prefix
-                     (ggtags-with-process-environment
-                      (split-string
-                       (apply #'ggtags-process-string
-                              "global"
-                              ;; Note -c alone returns only definitions
-                              (if completion-ignore-case
-                                  (list "--ignore-case" "-Tc" prefix)
-                                (list "-Tc" prefix)))
-                       "\n" t)))))
-       (cdr cache)))))
+  (completion-table-dynamic
+   (lambda (prefix)
+     (when (and (ggtags-find-project)
+                (not (ggtags-project-oversize-p (ggtags-find-project))))
+       (ggtags-update-tags))
+     (unless (equal prefix (car ggtags-completion-cache))
+       (setq ggtags-completion-cache
+             (cons prefix
+                   (ggtags-with-process-environment
+                    (split-string
+                     (apply #'ggtags-process-string
+                            "global"
+                            ;; Note -c alone returns only definitions
+                            (if completion-ignore-case
+                                (list "--ignore-case" "-Tc" prefix)
+                              (list "-Tc" prefix)))
+                     "\n" t)))))
+     (cdr ggtags-completion-cache))))
 
 (defun ggtags-read-tag ()
   (ggtags-ensure-project)
