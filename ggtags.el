@@ -667,6 +667,8 @@ Global and Emacs."
 
 (defun ggtags-view-tag-history ()
   (interactive)
+  (and (ring-empty-p find-tag-marker-ring)
+       (user-error "Tag ring empty"))
   (let ((split-window-preferred-function ggtags-split-window-function)
         (inhibit-read-only t))
     (pop-to-buffer "*Tag Ring*")
@@ -676,7 +678,8 @@ Global and Emacs."
           ;; Use a function so that revert can work properly.
           (lambda ()
             (let ((counter (ring-length find-tag-marker-ring))
-                  (elements (ring-elements find-tag-marker-ring))
+                  (elements (or (ring-elements find-tag-marker-ring)
+                                (user-error "Tag ring empty")))
                   (action
                    (lambda (button) (interactive)
                      (let ((m (button-get button 'marker)))
@@ -727,7 +730,7 @@ Global and Emacs."
                                     (vector (number-to-string counter)
                                             "(dead)" "?" "?")))
                           (decf counter)))
-                      (or elements (user-error "No tags"))))))
+                      elements))))
     (tabulated-list-print)
     (fit-window-to-buffer)))
 
