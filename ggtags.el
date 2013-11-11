@@ -342,7 +342,8 @@ properly update `ggtags-mode-map'."
   "Save Gnu Global's specific environment variables."
   (interactive "P")
   (ggtags-check-project)
-  (let* ((default-directory (ggtags-current-project-root))
+  (let* ((inhibit-read-only t)          ; for `add-dir-local-variable'
+         (default-directory (ggtags-current-project-root))
          ;; Not using `ggtags-with-process-environment' to preserve
          ;; environment variables that may be present in
          ;; `ggtags-process-environment'.
@@ -363,6 +364,21 @@ properly update `ggtags-mode-map'."
                         collect (concat x "=" (getenv x)))))
     (add-dir-local-variable nil 'ggtags-process-environment envlist)
     (unless confirm (save-buffer) (kill-buffer))))
+
+(defun ggtags-toggle-project-read-only ()
+  (interactive)
+  (ggtags-check-project)
+  (let ((inhibit-read-only t)           ; for `add-dir-local-variable'
+        (val (not buffer-read-only))
+        (default-directory (ggtags-current-project-root)))
+    (add-dir-local-variable nil 'buffer-read-only val)
+    (save-buffer)
+    (kill-buffer)
+    (when buffer-file-name
+      (setq buffer-read-only val))
+    (when (called-interactively-p 'interactive)
+      (message "Project read-only-mode is %s" (if val "on" "off")))
+    val))
 
 (defun ggtags-ensure-project ()
   (interactive)
