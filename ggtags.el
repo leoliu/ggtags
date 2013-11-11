@@ -58,6 +58,7 @@
   (require 'url-parse))
 
 (require 'compile)
+(require 'etags)
 
 (eval-when-compile
   (unless (fboundp 'setq-local)
@@ -476,7 +477,6 @@ properly update `ggtags-mode-map'."
 
 (defun ggtags-global-save-start-marker ()
   (when (markerp ggtags-global-start-marker)
-    (eval-and-compile (require 'etags))
     (setq ggtags-tag-ring-index nil)
     (ring-insert find-tag-marker-ring ggtags-global-start-marker)
     (setq ggtags-global-start-marker t)))
@@ -657,8 +657,7 @@ Global and Emacs."
 (defun ggtags-next-mark (&optional arg)
   "Move to the next (newer) mark in the tag marker ring."
   (interactive)
-  (and (zerop (ring-length find-tag-marker-ring))
-       (user-error "No %s mark" (if arg "previous" "next")))
+  (and (ring-empty-p find-tag-marker-ring) (user-error "Tag ring empty"))
   (setq ggtags-tag-ring-index
         ;; Note `ring-minus1' gets newer item.
         (funcall (if arg #'ring-plus1 #'ring-minus1)
@@ -1127,6 +1126,9 @@ Global and Emacs."
                   (lambda () (interactive) (customize-group 'ggtags))))
     (define-key menu [save-project]
       '(menu-item "Save project settings" ggtags-save-project-settings))
+    (define-key menu [toggle-read-only]
+      '(menu-item "Toggle project read-only" ggtags-toggle-project-read-only
+                  :button (:toggle . buffer-read-only)))
     (define-key menu [sep2] menu-bar-separator)
     (define-key menu [browse-hypertext]
       '(menu-item "Browse as hypertext" ggtags-browse-file-as-hypertext
