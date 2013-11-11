@@ -165,6 +165,11 @@ If an integer abbreviate only names longer than that number."
   :type 'boolean
   :group 'ggtags)
 
+(defcustom ggtags-global-large-output 1000
+  "Number of lines in the Global buffer to indicate large output."
+  :type 'number
+  :group 'ggtags)
+
 (defcustom ggtags-mode-prefix-key "\C-c"
   "Key binding used for `ggtags-mode-prefix-map'.
 Users should change the value using `customize-variable' to
@@ -743,7 +748,9 @@ Global and Emacs."
                    0))))
     (setq ggtags-global-match-count count)
     ;; Clear the start marker in case of zero matches.
-    (and (zerop count) (setq ggtags-global-start-marker nil))
+    (and (zerop count)
+         (markerp ggtags-global-start-marker)
+         (setq ggtags-global-start-marker nil))
     (cons (if (> exit-status 0)
               msg
             (format "found %d %s" count (if (= count 1) "match" "matches")))
@@ -803,13 +810,21 @@ Global and Emacs."
                    (get-text-property (match-beginning sub) 'compilation-message))
           (ggtags-abbreviate-file (match-beginning sub) (match-end sub)))))))
 
+(defvar-local ggtags-global-output-lines 0)
+
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
   ;; Get rid of line "Using config file '/PATH/TO/.globalrc'."
   (when (re-search-backward "^ *Using config file '.*\n"
                             compilation-filter-start t)
     (replace-match ""))
-  (ansi-color-apply-on-region compilation-filter-start (point)))
+  (ansi-color-apply-on-region compilation-filter-start (point))
+  (incf ggtags-global-output-lines
+        (count-lines compilation-filter-start (point)))
+  (when (> ggtags-global-output-lines ggtags-global-large-output)
+    (let ((message-log-max nil))
+      (message "Output %d lines (Type `C-c C-k' to cancel)"
+               ggtags-global-output-lines))))
 
 (defun ggtags-handle-single-match (buf _how)
   (when (and ggtags-auto-jump-to-first-match
@@ -865,6 +880,9 @@ Global and Emacs."
     (define-key map "\M-{" 'ggtags-navigation-previous-file)
     (define-key map "\M->" 'ggtags-navigation-last-error)
     (define-key map "\M-<" 'ggtags-navigation-first-error)
+    (define-key map "\C-c\C-k"
+      (lambda () (interactive)
+        (ggtags-ensure-global-buffer (kill-compilation))))
     (define-key map "\M-o" 'ggtags-navigation-visible-mode)
     (define-key map [return] 'ggtags-navigation-mode-done)
     (define-key map "\r" 'ggtags-navigation-mode-done)
