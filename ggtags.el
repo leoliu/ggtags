@@ -719,7 +719,6 @@ Global and Emacs."
                        :right-align t)
                       ("Contents" 100 t)])
               (tabulated-list-init-header)
-              (setq tabulated-list-sort-key '("ID" . t))
               (mapcar (lambda (x)
                         (prog1
                             (list counter
@@ -736,6 +735,7 @@ Global and Emacs."
                                             "(dead)" "?" "?")))
                           (decf counter)))
                       elements))))
+    (setq tabulated-list-sort-key '("ID" . t))
     (tabulated-list-print)
     (fit-window-to-buffer)))
 
