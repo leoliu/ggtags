@@ -403,9 +403,12 @@ properly update `ggtags-mode-map'."
           (ggtags-find-project)))))
 
 (defun ggtags-update-tags (&optional force)
-  "Update GNU Global tag database."
+  "Update GNU Global tag database.
+Do nothing if GTAGS exceeds the oversize limit unless FORCE is
+non-nil."
   (interactive "P")
   (when (or force (and (ggtags-find-project)
+                       (not (ggtags-project-oversize-p (ggtags-find-project)))
                        (ggtags-project-dirty-p (ggtags-find-project))))
     (ggtags-with-process-environment
      (with-temp-message "Running `global -u'"
@@ -417,9 +420,7 @@ properly update `ggtags-mode-map'."
 (defvar ggtags-completion-table
   (completion-table-dynamic
    (lambda (prefix)
-     (when (and (ggtags-find-project)
-                (not (ggtags-project-oversize-p (ggtags-find-project))))
-       (ggtags-update-tags))
+     (ggtags-update-tags)
      (unless (equal prefix (car ggtags-completion-cache))
        (setq ggtags-completion-cache
              (cons prefix
@@ -488,6 +489,7 @@ properly update `ggtags-mode-map'."
     (ggtags-navigation-mode +1)
     (setq ggtags-global-exit-status 0
           ggtags-global-match-count 0)
+    (ggtags-update-tags)
     (ggtags-with-process-environment
      (setq ggtags-global-last-buffer
            (compilation-start command 'ggtags-global-mode)))))
@@ -977,8 +979,8 @@ Global and Emacs."
   (ggtags-navigation-mode -1)
   ;; Run after (ggtags-navigation-mode -1) or
   ;; ggtags-global-start-marker might not have been saved.
-  (when (and (not (markerp ggtags-global-start-marker))
-             ggtags-global-start-marker)
+  (when (and ggtags-global-start-marker
+             (not (markerp ggtags-global-start-marker)))
     (setq ggtags-global-start-marker nil)
     (pop-tag-mark))
   (ggtags-navigation-mode-cleanup nil 0))
@@ -1156,7 +1158,7 @@ Global and Emacs."
     (define-key menu [idutils]
       '(menu-item "Query idutils DB" ggtags-idutils-query))
     (define-key menu [grep]
-      '(menu-item "Use grep" ggtags-grep))
+      '(menu-item "Grep" ggtags-grep))
     (define-key menu [find-symbol]
       '(menu-item "Find other symbol" ggtags-find-other-symbol))
     (define-key menu [find-tag-regexp]
@@ -1213,8 +1215,7 @@ Global and Emacs."
     (ggtags-find-project))
   (when (and ggtags-mode ggtags-project)
     (unless (overlayp ggtags-highlight-tag-overlay)
-      (let ((o (make-overlay (point) (point) nil t)))
-        (setq ggtags-highlight-tag-overlay o)))
+      (setq ggtags-highlight-tag-overlay (make-overlay (point) (point) nil t)))
     (let ((bounds (funcall ggtags-bounds-of-tag-function))
           (o ggtags-highlight-tag-overlay))
       (cond
