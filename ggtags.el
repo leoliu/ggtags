@@ -519,8 +519,7 @@ With a prefix arg (non-nil DEFINITION) always find definitions."
       (ggtags-find-tag 'definition name)
     (ggtags-find-tag (format "--from-here=%d:%s"
                              (line-number-at-pos)
-                             (shell-quote-argument
-                              (file-relative-name buffer-file-name)))
+                             (buffer-file-name))
                      name)))
 
 (defun ggtags-find-reference (name)
