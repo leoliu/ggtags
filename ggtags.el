@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.3
+;; Version: 0.7.4
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -91,10 +91,7 @@
   "The over size limit for the  GTAGS file.
 For large source trees, running 'global -u' can be expensive.
 Thus when GTAGS file is larger than this limit, ggtags
-automatically switches to 'global --single-update'.
-
-Change is effective when a project's information is renewed.
-See also `ggtags-project-duration'."
+automatically switches to 'global --single-update'."
   :safe 'numberp
   :type '(choice (const :tag "None" nil)
                  (const :tag "Always" t)
@@ -289,25 +286,21 @@ properly update `ggtags-mode-map'."
                            (:copier nil)
                            (:type vector)
                            :named)
-  root dirty-p has-rtags oversize-p timestamp)
+  root tag-size has-rtags dirty-p timestamp)
 
 (defun ggtags-make-project (root)
   (check-type root string)
   (let* ((default-directory (file-name-as-directory root))
+         (tag-size (or (nth 7 (file-attributes "GTAGS")) -1))
          (rtags-size (nth 7 (file-attributes "GRTAGS")))
          (has-rtags
           (when rtags-size
             (or (> rtags-size (* 32 1024))
                 (with-demoted-errors
-                  (not (equal "" (ggtags-process-string "global" "-crs")))))))
-         (oversize-p (pcase ggtags-oversize-limit
-                       (`nil nil)
-                       (`t t)
-                       (t (> (or (nth 7 (file-attributes "GTAGS")) 0)
-                             ggtags-oversize-limit)))))
+                  (not (equal "" (ggtags-process-string "global" "-crs"))))))))
     (puthash default-directory (ggtags-project--make
                                 :root default-directory :has-rtags has-rtags
-                                :oversize-p oversize-p :timestamp (float-time))
+                                :tag-size tag-size :timestamp (float-time))
              ggtags-projects)))
 
 (defvar-local ggtags-project 'unset)
@@ -316,6 +309,13 @@ properly update `ggtags-mode-map'."
   (> (- (float-time)
         (ggtags-project-timestamp project))
      ggtags-project-duration))
+
+(defun ggtags-project-oversize-p (&optional project)
+  (pcase ggtags-oversize-limit
+    (`nil nil)
+    (`t t)
+    (size (let ((project (or project (ggtags-find-project))))
+            (and project (> (ggtags-project-tag-size project) size))))))
 
 ;;;###autoload
 (defun ggtags-find-project ()
@@ -408,7 +408,7 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE is
 non-nil."
   (interactive "P")
   (when (or force (and (ggtags-find-project)
-                       (not (ggtags-project-oversize-p (ggtags-find-project)))
+                       (not (ggtags-project-oversize-p))
                        (ggtags-project-dirty-p (ggtags-find-project))))
     (ggtags-with-process-environment
      (with-temp-message "Running `global -u'"
@@ -1086,8 +1086,7 @@ Global and Emacs."
   (when (ggtags-find-project)
     (setf (ggtags-project-dirty-p (ggtags-find-project)) t)
     ;; When oversize update on a per-save basis.
-    (when (and buffer-file-name
-               (ggtags-project-oversize-p (ggtags-find-project)))
+    (when (and buffer-file-name (ggtags-project-oversize-p))
       (ggtags-with-process-environment
        (process-file "global" nil 0 nil "--single-update"
                      (file-relative-name buffer-file-name))))))
