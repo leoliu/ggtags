@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.5
+;; Version: 0.7.6
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -339,7 +339,7 @@ properly update `ggtags-mode-map'."
 (defun ggtags-check-project ()
   (or (ggtags-find-project) (error "File GTAGS not found")))
 
-(defun ggtags-save-project-settings (&optional confirm)
+(defun ggtags-save-project-settings (&optional noconfirm)
   "Save Gnu Global's specific environment variables."
   (interactive "P")
   (ggtags-check-project)
@@ -353,18 +353,28 @@ properly update `ggtags-mode-map'."
                   process-environment
                   (and (not (ggtags-project-has-rtags (ggtags-find-project)))
                        (list "GTAGSLABEL=ctags"))))
-         (envlist (loop for x in '("GTAGSROOT"
-                                   "GTAGSDBPATH"
-                                   "GTAGSLIBPATH"
-                                   "GTAGSCONF"
-                                   "GTAGSLABEL"
-                                   "MAKEOBJDIRPREFIX"
-                                   "GTAGSTHROUGH"
-                                   "GTAGSBLANKENCODE")
-                        when (getenv x)
-                        collect (concat x "=" (getenv x)))))
+         (envlist (delete-dups
+                   (loop for x in process-environment
+                         when (string-match
+                               "^\\(GTAGS[^=\n]*\\|MAKEOBJDIRPREFIX\\)=" x)
+                         ;; May have duplicates thus `delete-dups'.
+                         collect (concat (match-string 1 x)
+                                         "="
+                                         (getenv (match-string 1 x))))))
+         (help-form (format "y: save\nn: don't save\n=: diff\n?: help\n")))
     (add-dir-local-variable nil 'ggtags-process-environment envlist)
-    (unless confirm (save-buffer) (kill-buffer))))
+    ;; Remove trailing newlines by `add-dir-local-variable'.
+    (let ((delete-trailing-lines t)) (delete-trailing-whitespace))
+    (or noconfirm
+        (while (pcase (read-char-choice
+                       (format "Save `%s'? (y/n/=/?) " buffer-file-name)
+                       '(?y ?n ?= ??))
+                 (?n (user-error "Aborted"))
+                 (?y nil)
+                 (?= (diff-buffer-with-file) 'loop)
+                 (?? (help-form-show) 'loop))))
+    (save-buffer)
+    (kill-buffer)))
 
 (defun ggtags-toggle-project-read-only ()
   (interactive)
