@@ -88,7 +88,7 @@
   "Face used to highlight matched line in Global buffer."
   :group 'ggtags)
 
-(defcustom ggtags-oversize-limit (* 50 1024 1024)
+(defcustom ggtags-oversize-limit (* 10 1024 1024)
   "The over size limit for the  GTAGS file.
 For large source trees, running 'global -u' can be expensive.
 Thus when GTAGS file is larger than this limit, ggtags
@@ -431,7 +431,6 @@ non-nil."
 (defvar ggtags-completion-table
   (completion-table-dynamic
    (lambda (prefix)
-     (ggtags-update-tags)
      (unless (equal prefix (car ggtags-completion-cache))
        (setq ggtags-completion-cache
              (cons prefix
@@ -452,6 +451,7 @@ non-nil."
         (completing-read-function ggtags-completing-read-function))
     (setq ggtags-current-tag-name
           (cond (current-prefix-arg
+                 (ggtags-update-tags)
                  (completing-read
                   (format (if default "Tag (default %s): " "Tag: ") default)
                   ggtags-completion-table nil t nil nil default))
