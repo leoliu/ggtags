@@ -773,11 +773,18 @@ Global and Emacs."
 
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (setq ggtags-global-exit-status exit-status)
-  (let ((count (save-excursion
+  (pcase-let ((`(,count . ,db)
+               (save-excursion
                  (goto-char (point-max))
                  (if (re-search-backward "^\\([0-9]+\\) \\w+ located" nil t)
-                     (string-to-number (match-string 1))
-                   0))))
+                     (cons (string-to-number (match-string 1))
+                           (when (re-search-forward
+                                  "using \\(?:\\(idutils\\)\\|'[^']*/\\(\\w+\\)'\\)"
+                                  (line-end-position)
+                                  t)
+                             (or (and (match-string 1) "ID")
+                                 (match-string 2))))
+                   (cons 0 nil)))))
     (setq ggtags-global-match-count count)
     ;; Clear the start marker in case of zero matches.
     (and (zerop count)
@@ -785,7 +792,15 @@ Global and Emacs."
          (setq ggtags-global-start-marker nil))
     (cons (if (> exit-status 0)
               msg
-            (format "found %d %s" count (if (= count 1) "match" "matches")))
+            (format "found %d %s"
+                    count
+                    (funcall (if (= count 1) 'first 'second)
+                             (pcase db
+                               ("GTAGS"  '("definition" "definitions"))
+                               ("GSYMS"  '("symbol"     "symbols"))
+                               ("GRTAGS" '("reference"  "references"))
+                               ("ID"     '("identifier" "identifiers"))
+                               (_        '("match"      "matches"))))))
           exit-status)))
 
 ;;; NOTE: Must not match the 'Global started at Mon Jun 3 10:24:13'
