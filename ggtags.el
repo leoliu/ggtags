@@ -887,10 +887,11 @@ Global and Emacs."
                       (end-of-line)
                       (compilation-next-single-property-change
                        (point) 'compilation-message)))))
+    ;; For the `compilation-auto-jump' in idle timer to run. See also:
+    ;; http://debbugs.gnu.org/13829
+    (sit-for 0)
     (ggtags-navigation-mode -1)
-    ;; 0.5s delay for `ggtags-auto-jump-to-first-match'
-    (sit-for 0)                    ; See: http://debbugs.gnu.org/13829
-    (ggtags-navigation-mode-cleanup buf 0.5)))
+    (ggtags-navigation-mode-cleanup buf 0)))
 
 (defvar ggtags-global-mode-font-lock-keywords
   '(("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
@@ -1082,9 +1083,6 @@ Global and Emacs."
       (progn
         (add-hook 'next-error-hook 'ggtags-global-next-error-hook)
         (add-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function))
-    ;; Call `ggtags-global-save-start-marker' in case of exiting from
-    ;; `ggtags-handle-single-match' for single match.
-    (ggtags-global-save-start-marker)
     (remove-hook 'next-error-hook 'ggtags-global-next-error-hook)
     (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function)))
 
