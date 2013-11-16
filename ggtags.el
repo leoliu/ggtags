@@ -776,8 +776,10 @@ Global and Emacs."
   (pcase-let ((`(,count . ,db)
                (save-excursion
                  (goto-char (point-max))
-                 (if (re-search-backward "^\\([0-9]+\\) \\w+ located" nil t)
-                     (cons (string-to-number (match-string 1))
+                 (if (re-search-backward
+                      "^\\w+ \\(not found\\)\\|^\\([0-9]+\\) \\w+ located" nil t)
+                     (cons (or (and (match-string 1) 0)
+                               (string-to-number (match-string 2)))
                            (when (re-search-forward
                                   "using \\(?:\\(idutils\\)\\|'[^']*/\\(\\w+\\)'\\)"
                                   (line-end-position)
