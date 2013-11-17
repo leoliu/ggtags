@@ -946,9 +946,7 @@ Global and Emacs."
     (define-key map "\M-o" 'ggtags-navigation-visible-mode)
     (define-key map [return] 'ggtags-navigation-mode-done)
     (define-key map "\r" 'ggtags-navigation-mode-done)
-    ;; Intercept M-. and M-* keys
     (define-key map [remap pop-tag-mark] 'ggtags-navigation-mode-abort)
-    (define-key map [remap ggtags-find-tag-dwim] 'undefined)
     map))
 
 (defvar ggtags-mode-map-alist
