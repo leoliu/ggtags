@@ -70,7 +70,12 @@
     (defmacro defvar-local (var val &optional docstring)
       (declare (debug defvar) (doc-string 3))
       (list 'progn (list 'defvar var val docstring)
-            (list 'make-variable-buffer-local (list 'quote var))))))
+            (list 'make-variable-buffer-local (list 'quote var)))))
+
+  (defmacro* when-let ((var exp) &rest body)
+    "A macro that combines `let' and `when'."
+    (declare (indent 1) (debug ((sexp form) body)))
+    `(let ((,var ,exp)) (when ,var ,@body))))
 
 (eval-and-compile
   (or (fboundp 'user-error)
@@ -175,8 +180,8 @@ Users should change the value using `customize-variable' to
 properly update `ggtags-mode-map'."
   :set (lambda (sym value)
          (when (bound-and-true-p ggtags-mode-map)
-           (let ((old (and (boundp sym) (symbol-value sym))))
-             (and old (define-key ggtags-mode-map old nil)))
+           (when-let (old (and (boundp sym) (symbol-value sym)))
+             (define-key ggtags-mode-map old nil))
            (and value
                 (bound-and-true-p ggtags-mode-prefix-map)
                 (define-key ggtags-mode-map value ggtags-mode-prefix-map)))
@@ -264,8 +269,8 @@ properly update `ggtags-mode-map'."
          (ggtags-list-of-string-p (cdr xs)))))
 
 (defun ggtags-get-libpath ()
-  (let ((path (ggtags-with-process-environment (getenv "GTAGSLIBPATH"))))
-    (and path (split-string path (regexp-quote path-separator) t))))
+  (when-let (path (ggtags-with-process-environment (getenv "GTAGSLIBPATH")))
+    (split-string path (regexp-quote path-separator) t)))
 
 (defun ggtags-process-string (program &rest args)
   (with-temp-buffer
@@ -279,8 +284,8 @@ properly update `ggtags-mode-map'."
       output)))
 
 (defun ggtags-tag-at-point ()
-  (let ((bounds (funcall ggtags-bounds-of-tag-function)))
-    (and bounds (buffer-substring (car bounds) (cdr bounds)))))
+  (when-let (bounds (funcall ggtags-bounds-of-tag-function))
+    (buffer-substring (car bounds) (cdr bounds))))
 
 ;;; Store for project settings
 
@@ -318,8 +323,8 @@ properly update `ggtags-mode-map'."
   (pcase ggtags-oversize-limit
     (`nil nil)
     (`t t)
-    (size (let ((project (or project (ggtags-find-project))))
-            (and project (> (ggtags-project-tag-size project) size))))))
+    (size (when-let (project (or project (ggtags-find-project)))
+            (> (ggtags-project-tag-size project) size)))))
 
 ;;;###autoload
 (defun ggtags-find-project ()
@@ -336,9 +341,9 @@ properly update `ggtags-mode-map'."
                     ;; the GTAGS file which could cause issues such as
                     ;; https://github.com/leoliu/ggtags/issues/22, so
                     ;; let's help it out.
-                    (let ((gtags (locate-dominating-file
-                                  default-directory "GTAGS")))
-                      (and gtags (file-truename gtags))))))
+                    (when-let (gtags (locate-dominating-file
+                                      default-directory "GTAGS"))
+                      (file-truename gtags)))))
       (setq ggtags-project
             (and root (or (gethash root ggtags-projects)
                           (ggtags-make-project root)))))))
@@ -1287,18 +1292,17 @@ Global and Emacs."
 ;;;###autoload
 (defun ggtags-build-imenu-index ()
   "A function suitable for `imenu-create-index-function'."
-  (when buffer-file-name
-    (let ((file (file-relative-name buffer-file-name)))
-      (with-temp-buffer
-        (when (with-demoted-errors
-                (zerop (ggtags-with-process-environment
-                        (process-file "global" nil t nil "-x" "-f" file))))
-          (goto-char (point-min))
-          (loop while (re-search-forward
-                       "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
-                collect (list (match-string 1)
-                              (string-to-number (match-string 2))
-                              'ggtags-goto-imenu-index)))))))
+  (when-let (file (and buffer-file-name (file-relative-name buffer-file-name)))
+    (with-temp-buffer
+      (when (with-demoted-errors
+              (zerop (ggtags-with-process-environment
+                      (process-file "global" nil t nil "-x" "-f" file))))
+        (goto-char (point-min))
+        (loop while (re-search-forward
+                     "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
+              collect (list (match-string 1)
+                            (string-to-number (match-string 2))
+                            'ggtags-goto-imenu-index))))))
 
 ;;; hippie-expand
 
