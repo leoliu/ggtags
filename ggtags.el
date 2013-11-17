@@ -1246,9 +1246,6 @@ Global and Emacs."
 (put 'ggtags-active-tag 'face 'ggtags-highlight)
 (put 'ggtags-active-tag 'keymap ggtags-highlight-tag-map)
 ;; (put 'ggtags-active-tag 'mouse-face 'match)
-(put 'ggtags-active-tag 'modification-hooks
-     (list (lambda (o after &rest _args)
-             (and (not after) (delete-overlay o)))))
 (put 'ggtags-active-tag 'help-echo
      "S-down-mouse-1 for definitions\nS-down-mouse-3 for references")
 
@@ -1257,21 +1254,26 @@ Global and Emacs."
     (ggtags-find-project))
   (when (and ggtags-mode ggtags-project)
     (unless (overlayp ggtags-highlight-tag-overlay)
-      (setq ggtags-highlight-tag-overlay (make-overlay (point) (point) nil t)))
+      (setq ggtags-highlight-tag-overlay (make-overlay (point) (point) nil t))
+      (overlay-put ggtags-highlight-tag-overlay 'modification-hooks
+                   (list (lambda (o after &rest _args)
+                           (and (not after) (delete-overlay o))))))
     (let ((bounds (funcall ggtags-bounds-of-tag-function))
           (o ggtags-highlight-tag-overlay))
       (cond
        ((and bounds
-             (overlay-get o 'category)
              (eq (overlay-buffer o) (current-buffer))
              (= (overlay-start o) (car bounds))
              (= (overlay-end o) (cdr bounds)))
-        ;; Tag is already highlighted so do nothing.
+        ;; Overlay matches current tag so do nothing.
         nil)
        ((and bounds (let ((completion-ignore-case nil))
-                      (test-completion
-                       (buffer-substring (car bounds) (cdr bounds))
-                       ggtags-completion-table)))
+                      (ignore-errors
+                        ;; May throw: global: only name char is
+                        ;; allowed with -c option
+                        (test-completion
+                         (buffer-substring (car bounds) (cdr bounds))
+                         ggtags-completion-table))))
         (move-overlay o (car bounds) (cdr bounds) (current-buffer))
         (overlay-put o 'category 'ggtags-active-tag))
        (t (move-overlay o
