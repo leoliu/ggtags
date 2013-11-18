@@ -1139,6 +1139,7 @@ Global and Emacs."
 
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
+    (define-key m "\M-'" 'previous-error)
     (define-key m (kbd "M-DEL") 'ggtags-delete-tag-files)
     (define-key m "\M-p" 'ggtags-prev-mark)
     (define-key m "\M-n" 'ggtags-next-mark)
@@ -1196,6 +1197,10 @@ Global and Emacs."
     (define-key menu [prev-mark]
       '(menu-item "Previous mark" ggtags-prev-mark))
     (define-key menu [sep1] menu-bar-separator)
+    (define-key menu [previous-error]
+      '(menu-item "Previous match" previous-error))
+    (define-key menu [next-error]
+      '(menu-item "Next match" next-error))
     (define-key menu [find-file]
       '(menu-item "Find files" ggtags-find-file))
     (define-key menu [query-replace]
