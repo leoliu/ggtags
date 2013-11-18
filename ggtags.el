@@ -246,20 +246,19 @@ properly update `ggtags-mode-map'."
 
 (defmacro ggtags-with-process-environment (&rest body)
   (declare (debug t))
-  `(let ((process-environment
-          (append (let ((process-environment process-environment))
-                    (when (ggtags-find-project)
-                      (setenv "GTAGSROOT" (directory-file-name
-                                           (ggtags-current-project-root))))
-                    (mapcar #'substitute-env-vars ggtags-process-environment))
-                  process-environment
-                  (and (ggtags-current-project-root)
-                       (list (concat "GTAGSROOT="
-                                     (ggtags-current-project-root))))
-                  (and (ggtags-find-project)
-                       (not (ggtags-project-has-rtags (ggtags-find-project)))
-                       (list "GTAGSLABEL=ctags")))))
-     ,@body))
+  (let ((gtagsroot (make-symbol "-gtagsroot-")))
+    `(let* ((,gtagsroot (when (ggtags-find-project)
+                          (directory-file-name (ggtags-current-project-root))))
+            (process-environment
+             (append (let ((process-environment process-environment))
+                       (and ,gtagsroot (setenv "GTAGSROOT" ,gtagsroot))
+                       (mapcar #'substitute-env-vars ggtags-process-environment))
+                     process-environment
+                     (and ,gtagsroot (list (concat "GTAGSROOT=" ,gtagsroot)))
+                     (and (ggtags-find-project)
+                          (not (ggtags-project-has-rtags (ggtags-find-project)))
+                          (list "GTAGSLABEL=ctags")))))
+       ,@body)))
 
 (defun ggtags-list-of-string-p (xs)
   "Return non-nil if XS is a list of strings."
@@ -492,7 +491,7 @@ non-nil."
                             (`grep "--grep")
                             (`idutils "--idutils")))
                     args)))
-    (mapconcat 'identity (delq nil xs) " ")))
+    (mapconcat #'identity (delq nil xs) " ")))
 
 ;; takes three values: nil, t and a marker
 (defvar ggtags-global-start-marker nil)
@@ -549,8 +548,12 @@ With a prefix arg (non-nil DEFINITION) always find definitions."
              (shell-quote-argument
               ;; Note `ggtags-global-start' binds default-directory to
               ;; project root.
-              (file-relative-name buffer-file-name
-                                  (ggtags-current-project-root))))
+              (file-relative-name
+               buffer-file-name
+               (if (string-prefix-p (ggtags-current-project-root)
+                                    buffer-file-name)
+                   (ggtags-current-project-root)
+                 (locate-dominating-file buffer-file-name "GTAGS")))))
      name)))
 
 (defun ggtags-find-reference (name)
@@ -657,7 +660,7 @@ Global and Emacs."
             (progn
               (fit-window-to-buffer win)
               (when (yes-or-no-p "Remove GNU Global tag files? ")
-                (mapc 'delete-file files)
+                (mapc #'delete-file files)
                 (remhash (ggtags-current-project-root) ggtags-projects)
                 (delete-overlay ggtags-highlight-tag-overlay)
                 (kill-local-variable 'ggtags-project)))
@@ -748,7 +751,7 @@ Global and Emacs."
                          (buffer-substring (line-beginning-position)
                                            (line-end-position)))))))
               (setq tabulated-list-format
-                    `[("ID" ,(max (1+ (floor (log10 counter))) 2)
+                    `[("ID" ,(max (1+ (floor (log counter 10))) 2)
                        (lambda (x y) (< (car x) (car y))))
                       ("Buffer" ,(max (loop for m in elements
                                             for b = (marker-buffer m)
@@ -758,7 +761,7 @@ Global and Emacs."
                        t :right-align t)
                       ("Position" ,(max (loop for m in elements
                                               for p = (or (marker-position m) 1)
-                                              maximize (1+ (floor (log10 p))))
+                                              maximize (1+ (floor (log p 10))))
                                         8)
                        (lambda (x y)
                          (< (string-to-number (aref (cadr x) 2))
@@ -811,7 +814,7 @@ Global and Emacs."
               msg
             (format "found %d %s"
                     count
-                    (funcall (if (= count 1) 'first 'second)
+                    (funcall (if (= count 1) #'car #'cadr)
                              (pcase db
                                ("GTAGS"  '("definition" "definitions"))
                                ("GSYMS"  '("symbol"     "symbols"))
@@ -1011,7 +1014,7 @@ Global and Emacs."
            (when (and (derived-mode-p 'ggtags-global-mode)
                       (get-buffer-window))
              (quit-window nil (get-buffer-window)))
-           (and time (run-with-idle-timer time nil 'kill-buffer buf))))))
+           (and time (run-with-idle-timer time nil #'kill-buffer buf))))))
 
 (defun ggtags-navigation-mode-done ()
   (interactive)
@@ -1225,7 +1228,7 @@ Global and Emacs."
   (unless (timerp ggtags-highlight-tag-timer)
     (setq ggtags-highlight-tag-timer
           (run-with-idle-timer
-           ggtags-highlight-tag-delay t 'ggtags-highlight-tag-at-point)))
+           ggtags-highlight-tag-delay t #'ggtags-highlight-tag-at-point)))
   (if ggtags-mode
       (progn
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
@@ -1322,7 +1325,7 @@ Global and Emacs."
                  (ggtags-find-project)
                  (sort (all-completions he-search-string
                                         ggtags-completion-table)
-                       'string-lessp))))
+                       #'string-lessp))))
     (if (null he-expand-list)
         (progn
           (if old (he-reset-string))
