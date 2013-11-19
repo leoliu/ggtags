@@ -900,6 +900,10 @@ Global and Emacs."
   (ansi-color-apply-on-region compilation-filter-start (point))
   (incf ggtags-global-output-lines
         (count-lines compilation-filter-start (point)))
+  (when (and (> ggtags-global-output-lines 5)
+             (not (get-buffer-window (current-buffer))))
+    (let ((split-window-preferred-function ggtags-split-window-function))
+      (display-buffer (current-buffer))))
   (when (> ggtags-global-output-lines ggtags-global-large-output)
     (let ((message-log-max nil))
       (message "Output %d lines (Type `C-c C-k' to cancel)"
