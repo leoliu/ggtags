@@ -102,10 +102,3 @@ Bugs
 ~~~~
 
 https://github.com/leoliu/ggtags/issues
-
-known problems
-++++++++++++++
-
-When there is only one match a window is still popped up to be closed
-immediately due to a `bug <http://debbugs.gnu.org/13594>`_ in
-``compile.el``.

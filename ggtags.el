@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.6
+;; Version: 0.7.7
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -509,7 +509,17 @@ non-nil."
 
 (defun ggtags-global-start (command &optional root)
   (let* ((default-directory (or root (ggtags-current-project-root)))
-         (split-window-preferred-function ggtags-split-window-function))
+         (split-window-preferred-function ggtags-split-window-function)
+         ;; See http://debbugs.gnu.org/13594
+         (display-buffer-overriding-action
+          (if (not ggtags-auto-jump-to-first-match)
+              display-buffer-overriding-action
+            (cons (lambda (buf action)
+                    (and (assq 'no-display-ok (cdr action))
+                         (with-current-buffer buf
+                           (derived-mode-p 'ggtags-global-mode))))
+                  ;; Suppress `display-buffer'.
+                  (list (lambda (&rest _) 'dont-display))))))
     (setq ggtags-global-start-marker (point-marker))
     (ggtags-navigation-mode +1)
     (setq ggtags-global-exit-status 0
