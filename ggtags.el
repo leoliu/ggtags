@@ -189,6 +189,12 @@ properly update `ggtags-mode-map'."
   :type 'key-sequence
   :group 'ggtags)
 
+(defcustom ggtags-enable-completion-at-point t
+  "Non-nil to enable completion at point using the tag table."
+  :safe 'booleanp
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-completing-read-function completing-read-function
   "Ggtags specific `completing-read-function' (which see)."
   :type 'function
@@ -462,6 +468,12 @@ non-nil."
                               (list "-Tc" prefix)))
                      "\n" t)))))
      (cdr ggtags-completion-cache))))
+
+(defun ggtags-completion-at-point ()
+  "A function for `completion-at-point-functions'."
+  (when-let (bounds (funcall ggtags-bounds-of-tag-function))
+    (and (< (car bounds) (cdr bounds))
+         (list (car bounds) (cdr bounds) ggtags-completion-table))))
 
 (defun ggtags-read-tag ()
   (ggtags-ensure-project)
@@ -1260,9 +1272,13 @@ Global and Emacs."
   (if ggtags-mode
       (progn
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
+        (when ggtags-enable-completion-at-point
+          (add-hook 'completion-at-point-functions
+                    #'ggtags-completion-at-point nil t))
         (or (executable-find "global")
             (message "Failed to find GNU Global")))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
+    (remove-hook 'completion-at-point-functions #'ggtags-completion-at-point t)
     (and (overlayp ggtags-highlight-tag-overlay)
          (delete-overlay ggtags-highlight-tag-overlay))
     (setq ggtags-highlight-tag-overlay nil)))
