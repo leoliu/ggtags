@@ -354,6 +354,13 @@ properly update `ggtags-mode-map'."
 (defun ggtags-check-project ()
   (or (ggtags-find-project) (error "File GTAGS not found")))
 
+(defun ggtags-ensure-project ()
+  (or (ggtags-find-project)
+      (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
+                (user-error "Aborted"))
+        (call-interactively #'ggtags-create-tags)
+        (ggtags-find-project))))
+
 (defun ggtags-save-project-settings (&optional noconfirm)
   "Save Gnu Global's specific environment variables."
   (interactive "P")
@@ -406,26 +413,23 @@ properly update `ggtags-mode-map'."
       (message "Project read-only-mode is %s" (if val "on" "off")))
     val))
 
-(defun ggtags-ensure-project ()
-  (interactive)
-  (or (ggtags-find-project)
-      (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
-                (user-error "Aborted"))
-        (let ((root (read-directory-name "Directory: " nil nil t))
-              (process-environment process-environment))
-          (and (zerop (length root)) (user-error "No directory chosen"))
-          (setenv "GTAGSROOT"
-                  (directory-file-name (file-name-as-directory root)))
-          (ggtags-with-process-environment
-           (and (not (getenv "GTAGSLABEL"))
-                (yes-or-no-p "Use `ctags' backend? ")
-                (setenv "GTAGSLABEL" "ctags"))
-           (with-temp-message "`gtags' in progress..."
-             (let ((default-directory (file-name-as-directory root)))
-               (apply #'ggtags-process-string
-                      "gtags" (and ggtags-use-idutils '("--idutils"))))))
-          (message "GTAGS generated in `%s'" root)
-          (ggtags-find-project)))))
+(defun ggtags-create-tags (root)
+  "Run `gtags' in directory ROOT to create tag files."
+  (interactive "DRoot directory: ")
+  (let ((process-environment process-environment))
+    (when (zerop (length root)) (error "No root directory provided"))
+    (setenv "GTAGSROOT"
+            (directory-file-name (file-name-as-directory root)))
+    (ggtags-with-process-environment
+     (and (not (getenv "GTAGSLABEL"))
+          (yes-or-no-p "Use `ctags' backend? ")
+          (setenv "GTAGSLABEL" "ctags"))
+     (with-temp-message "`gtags' in progress..."
+       (let ((default-directory (file-name-as-directory root)))
+         (apply #'ggtags-process-string
+                "gtags" (and ggtags-use-idutils '("--idutils"))))))
+    (message "GTAGS generated in `%s'" root)
+    root))
 
 (defun ggtags-update-tags (&optional force)
   "Update GNU Global tag database.
@@ -1242,7 +1246,7 @@ Global and Emacs."
       '(menu-item "Update tag files" ggtags-update-tags
                   :visible (ggtags-find-project)))
     (define-key menu [run-gtags]
-      '(menu-item "Run gtags" ggtags-ensure-project
+      '(menu-item "Run gtags" ggtags-create-tags
                   :visible (not (ggtags-find-project))))
     map))
 
