@@ -530,12 +530,10 @@ non-nil."
          (display-buffer-overriding-action
           (if (not ggtags-auto-jump-to-first-match)
               display-buffer-overriding-action
-            (cons (lambda (buf action)
-                    (and (assq 'no-display-ok (cdr action))
-                         (with-current-buffer buf
-                           (derived-mode-p 'ggtags-global-mode))))
-                  ;; Suppress `display-buffer'.
-                  (list (lambda (&rest _) 'dont-display))))))
+            (cons (lambda (buf _action)
+                    (with-current-buffer buf
+                      (derived-mode-p 'ggtags-global-mode)))
+                  (list #'display-buffer-no-window)))))
     (setq ggtags-global-start-marker (point-marker))
     (ggtags-navigation-mode +1)
     (setq ggtags-global-exit-status 0
@@ -919,7 +917,7 @@ Global and Emacs."
   (when (and (> ggtags-global-output-lines 5)
              (not (get-buffer-window (current-buffer))))
     (let* ((split-window-preferred-function ggtags-split-window-function)
-           (w (display-buffer (current-buffer) '(nil (no-display-ok . t)))))
+           (w (display-buffer (current-buffer) '(nil (allow-no-window . t)))))
       (and w (compilation-set-window-height w))))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
