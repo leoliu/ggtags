@@ -907,9 +907,11 @@ Global and Emacs."
 
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
-  ;; Get rid of line "Using config file '/PATH/TO/.globalrc'."
-  (when (re-search-backward "^ *Using config file '.*\n"
-                            compilation-filter-start t)
+  ;; Get rid of line "Using config file '/PATH/TO/.globalrc'." or
+  ;; "Using default configuration."
+  (when (re-search-backward
+         "^ *Using \\(?:config file '.*\\|default configuration.\\)\n"
+         compilation-filter-start t)
     (replace-match ""))
   (ansi-color-apply-on-region compilation-filter-start (point))
   (incf ggtags-global-output-lines
