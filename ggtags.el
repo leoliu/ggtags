@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.7
+;; Version: 0.7.8
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -688,7 +688,8 @@ Global and Emacs."
               (when (yes-or-no-p "Remove GNU Global tag files? ")
                 (mapc #'delete-file files)
                 (remhash (ggtags-current-project-root) ggtags-projects)
-                (delete-overlay ggtags-highlight-tag-overlay)
+                (and (overlayp ggtags-highlight-tag-overlay)
+                     (delete-overlay ggtags-highlight-tag-overlay))
                 (kill-local-variable 'ggtags-project)))
           (when (window-live-p win)
             (quit-window t win)))))))
@@ -970,6 +971,7 @@ Global and Emacs."
   (jit-lock-register #'ggtags-abbreviate-files)
   (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
   (add-hook 'compilation-finish-functions 'ggtags-handle-single-match nil t)
+  (add-hook 'kill-buffer-hook (lambda () (ggtags-navigation-mode -1)) nil t)
   (define-key ggtags-global-mode-map "\M-o" 'visible-mode))
 
 ;; NOTE: Need this to avoid putting menu items in
@@ -1114,14 +1116,16 @@ Global and Emacs."
 
 (define-minor-mode ggtags-navigation-mode nil
   :lighter
-  (" GG[" (:eval (ggtags-ensure-global-buffer
-                   (let ((index (when (get-text-property (line-beginning-position)
-                                                         'compilation-message)
-                                  ;; Assume the first match appears at line 5
-                                  (- (line-number-at-pos) 4))))
-                     `((:propertize ,(if index
-                                         (number-to-string (max index 0))
-                                       "?") face success) "/"))))
+  (" GG[" (:eval
+           (ignore-errors
+             (ggtags-ensure-global-buffer
+              (let ((index (when (get-text-property (line-beginning-position)
+                                                    'compilation-message)
+                             ;; Assume the first match appears at line 5
+                             (- (line-number-at-pos) 4))))
+                `((:propertize ,(if index
+                                    (number-to-string (max index 0))
+                                  "?") face success) "/")))))
    (:propertize (:eval (number-to-string ggtags-global-match-count))
                 face success)
    (:eval
