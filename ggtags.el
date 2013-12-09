@@ -967,6 +967,8 @@ Global and Emacs."
   (setq-local compilation-error-face 'compilation-info)
   (setq-local compilation-exit-message-function
               'ggtags-global-exit-message-function)
+  ;; See: https://github.com/leoliu/ggtags/issues/26
+  (setq-local find-file-suppress-same-file-warnings t)
   (setq-local truncate-lines t)
   (jit-lock-register #'ggtags-abbreviate-files)
   (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
