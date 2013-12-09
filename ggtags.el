@@ -1,4 +1,4 @@
-;;; ggtags.el --- GNU Global source code tagging system  -*- lexical-binding: t; -*-
+;;; ggtags.el --- emacs frontend to GNU Global source code tagging system  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
@@ -187,12 +187,6 @@ properly update `ggtags-mode-map'."
                 (define-key ggtags-mode-map value ggtags-mode-prefix-map)))
          (set-default sym value))
   :type 'key-sequence
-  :group 'ggtags)
-
-(defcustom ggtags-enable-completion-at-point t
-  "Non-nil to enable completion at point using the tag table."
-  :safe 'booleanp
-  :type 'boolean
   :group 'ggtags)
 
 (defcustom ggtags-completing-read-function completing-read-function
@@ -1278,11 +1272,9 @@ Global and Emacs."
   (if ggtags-mode
       (progn
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
-        (when ggtags-enable-completion-at-point
-          (add-hook 'completion-at-point-functions
-                    #'ggtags-completion-at-point nil t))
-        (or (executable-find "global")
-            (message "Failed to find GNU Global")))
+        ;; Append to serve as a fallback method.
+        (add-hook 'completion-at-point-functions
+                  #'ggtags-completion-at-point t t))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
     (remove-hook 'completion-at-point-functions #'ggtags-completion-at-point t)
     (and (overlayp ggtags-highlight-tag-overlay)

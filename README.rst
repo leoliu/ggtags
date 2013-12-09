@@ -1,7 +1,7 @@
-=========================
- Use GNU Global in Emacs
-=========================
-
+=========================================================
+ Emacs frontend to GNU Global source code tagging system
+=========================================================
+ 
 A package for working with `GNU Global
 <http://www.gnu.org/software/global>`_ source tagging system in Emacs.
 
