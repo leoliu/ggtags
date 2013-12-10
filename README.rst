@@ -8,6 +8,8 @@ A package for working with `GNU Global
 This package is part of `GNU ELPA <http://elpa.gnu.org>`_
 (``M-x list-packages``).
 
+``ggtags.el`` is tested in emacs 24.1, 24.2, 24.3 and trunk.
+
 Patches, feature requests and bug reports are welcome. Thanks.
 
 Features

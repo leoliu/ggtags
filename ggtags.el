@@ -391,10 +391,11 @@ properly update `ggtags-mode-map'."
         (while (pcase (read-char-choice
                        (format "Save `%s'? (y/n/=/?) " buffer-file-name)
                        '(?y ?n ?= ??))
-                 (?n (user-error "Aborted"))
-                 (?y nil)
-                 (?= (diff-buffer-with-file) 'loop)
-                 (?? (help-form-show) 'loop))))
+                 ;; ` required for 24.1 and 24.2
+                 (`?n (user-error "Aborted"))
+                 (`?y nil)
+                 (`?= (diff-buffer-with-file) 'loop)
+                 (`?? (help-form-show) 'loop))))
     (save-buffer)
     (kill-buffer)))
 
@@ -728,9 +729,10 @@ Global and Emacs."
         (i (- (ring-length find-tag-marker-ring) ggtags-tag-ring-index))
         (message-log-max nil))
     (message "%d%s marker%s" i (pcase (mod i 10)
-                                 (1 "st")
-                                 (2 "nd")
-                                 (3 "rd")
+                                 ;; ` required for 24.1 and 24.2
+                                 (`1 "st")
+                                 (`2 "nd")
+                                 (`3 "rd")
                                  (_ "th"))
              (if (marker-buffer m) "" " (dead)"))
     (if (not (marker-buffer m))
@@ -839,10 +841,11 @@ Global and Emacs."
                     count
                     (funcall (if (= count 1) #'car #'cadr)
                              (pcase db
-                               ("GTAGS"  '("definition" "definitions"))
-                               ("GSYMS"  '("symbol"     "symbols"))
-                               ("GRTAGS" '("reference"  "references"))
-                               ("ID"     '("identifier" "identifiers"))
+                               ;; ` required for 24.1 and 24.2
+                               (`"GTAGS"  '("definition" "definitions"))
+                               (`"GSYMS"  '("symbol"     "symbols"))
+                               (`"GRTAGS" '("reference"  "references"))
+                               (`"ID"     '("identifier" "identifiers"))
                                (_        '("match"      "matches"))))))
           exit-status)))
 
