@@ -705,7 +705,8 @@ Global and Emacs."
           (let ((default-directory (ggtags-current-project-root)))
             (ggtags-with-process-environment (ggtags-process-string "htags")))
         (user-error "Aborted")))
-  (let ((url (ggtags-process-string "gozilla" "-p" (format "+%d" line) file)))
+  (let ((url (ggtags-process-string "gozilla" "-p" (format "+%d" line)
+                                    (file-relative-name file))))
     (or (equal (file-name-extension
                 (url-filename (url-generic-parse-url url))) "html")
         (user-error "No hypertext form for `%s'" file))
@@ -905,6 +906,13 @@ Global and Emacs."
 
 (defvar-local ggtags-global-output-lines 0)
 
+(defun ggtags-global--display-buffer (&optional buffer)
+  (let ((buffer (or buffer (current-buffer))))
+    (unless (get-buffer-window buffer)
+      (let* ((split-window-preferred-function ggtags-split-window-function)
+             (w (display-buffer (current-buffer) '(nil (allow-no-window . t)))))
+        (and w (compilation-set-window-height w))))))
+
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
   ;; Get rid of line "Using config file '/PATH/TO/.globalrc'." or
@@ -916,11 +924,8 @@ Global and Emacs."
   (ansi-color-apply-on-region compilation-filter-start (point))
   (incf ggtags-global-output-lines
         (count-lines compilation-filter-start (point)))
-  (when (and (> ggtags-global-output-lines 5)
-             (not (get-buffer-window (current-buffer))))
-    (let* ((split-window-preferred-function ggtags-split-window-function)
-           (w (display-buffer (current-buffer) '(nil (allow-no-window . t)))))
-      (and w (compilation-set-window-height w))))
+  (when (> ggtags-global-output-lines 5)
+    (ggtags-global--display-buffer))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
     (incf ggtags-global-large-output 500)
@@ -929,22 +934,23 @@ Global and Emacs."
                ggtags-global-output-lines))))
 
 (defun ggtags-handle-single-match (buf _how)
-  (when (and ggtags-auto-jump-to-first-match
-             ;; If exit abnormally keep the window for inspection.
-             (zerop ggtags-global-exit-status)
-             (save-excursion
-               (goto-char (point-min))
-               (not (ignore-errors
-                      (goto-char (compilation-next-single-property-change
-                                  (point) 'compilation-message))
-                      (end-of-line)
-                      (compilation-next-single-property-change
-                       (point) 'compilation-message)))))
-    ;; For the `compilation-auto-jump' in idle timer to run. See also:
-    ;; http://debbugs.gnu.org/13829
-    (sit-for 0)
-    (ggtags-navigation-mode -1)
-    (ggtags-navigation-mode-cleanup buf 0)))
+  (if (not (zerop ggtags-global-exit-status))
+      ;; If exit abnormally display the buffer for inspection.
+      (ggtags-global--display-buffer)
+    (when (and ggtags-auto-jump-to-first-match
+               (save-excursion
+                 (goto-char (point-min))
+                 (not (ignore-errors
+                        (goto-char (compilation-next-single-property-change
+                                    (point) 'compilation-message))
+                        (end-of-line)
+                        (compilation-next-single-property-change
+                         (point) 'compilation-message)))))
+      ;; For the `compilation-auto-jump' in idle timer to run. See also:
+      ;; http://debbugs.gnu.org/13829
+      (sit-for 0)
+      (ggtags-navigation-mode -1)
+      (ggtags-navigation-mode-cleanup buf 0))))
 
 (defvar ggtags-global-mode-font-lock-keywords
   '(("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"

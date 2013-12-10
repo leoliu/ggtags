@@ -2,15 +2,12 @@
  Emacs frontend to GNU Global source code tagging system
 =========================================================
  
-A package for working with `GNU Global
-<http://www.gnu.org/software/global>`_ source tagging system in Emacs.
+This package is part of `GNU ELPA <http://elpa.gnu.org>`_ (``M-x
+list-packages``) and is also available on `MELPA
+<http://melpa.milkbox.net/#/ggtags>`_.
 
-This package is part of `GNU ELPA <http://elpa.gnu.org>`_
-(``M-x list-packages``).
-
-``ggtags.el`` is tested in emacs 24.1, 24.2, 24.3 and trunk.
-
-Patches, feature requests and bug reports are welcome. Thanks.
+``ggtags.el`` is tested in emacs 24.1, 24.2, 24.3 and trunk. Patches,
+feature requests and bug reports are welcome. Thanks.
 
 Features
 ~~~~~~~~
