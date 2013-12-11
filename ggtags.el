@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.8
+;; Version: 0.7.9
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -436,12 +436,12 @@ properly update `ggtags-mode-map'."
   "Update GNU Global tag database.
 Do nothing if GTAGS exceeds the oversize limit unless FORCE is
 non-nil."
-  (interactive "P")
+  (interactive "p")
   (when (or force (and (ggtags-find-project)
                        (not (ggtags-project-oversize-p))
                        (ggtags-project-dirty-p (ggtags-find-project))))
     (ggtags-with-process-environment
-     (with-temp-message "Running `global -u'"
+     (with-temp-message "`global -u' in progress..."
        (ggtags-process-string "global" "-u")
        (setf (ggtags-project-dirty-p (ggtags-find-project)) nil)))))
 
