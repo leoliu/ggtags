@@ -526,10 +526,7 @@ non-nil."
           (if (and ggtags-auto-jump-to-first-match
                    ;; Appeared in emacs 24.4.
                    (fboundp 'display-buffer-no-window))
-              (cons (lambda (buf _action)
-                      (with-current-buffer buf
-                        (derived-mode-p 'ggtags-global-mode)))
-                    (list #'display-buffer-no-window))
+              (list #'display-buffer-no-window)
             display-buffer-overriding-action)))
     (setq ggtags-global-start-marker (point-marker))
     (ggtags-navigation-mode +1)
