@@ -286,7 +286,7 @@ properly update `ggtags-mode-map'."
   (when-let (bounds (funcall ggtags-bounds-of-tag-function))
     (buffer-substring (car bounds) (cdr bounds))))
 
-;;; Store for project settings
+;;; Store for project info and settings
 
 (defvar ggtags-projects (make-hash-table :size 7 :test #'equal))
 
@@ -297,6 +297,7 @@ properly update `ggtags-mode-map'."
   root tag-size has-rtags dirty-p timestamp)
 
 (defun ggtags-make-project (root)
+  "Create or update project info for ROOT."
   (check-type root string)
   (let* ((default-directory (file-name-as-directory root))
          (tag-size (or (nth 7 (file-attributes "GTAGS")) -1))
@@ -305,18 +306,23 @@ properly update `ggtags-mode-map'."
           (when rtags-size
             (or (> rtags-size (* 32 1024))
                 (with-demoted-errors
-                  (not (equal "" (ggtags-process-string "global" "-crs"))))))))
-    (puthash default-directory (ggtags-project--make
-                                :root default-directory :has-rtags has-rtags
-                                :tag-size tag-size :timestamp (float-time))
-             ggtags-projects)))
+                  (not (equal "" (ggtags-process-string "global" "-crs")))))))
+         (project (or (gethash default-directory ggtags-projects)
+                      (puthash default-directory
+                               (ggtags-project--make :root default-directory)
+                               ggtags-projects))))
+    (setf (ggtags-project-has-rtags project) has-rtags
+          (ggtags-project-tag-size project) tag-size
+          (ggtags-project-timestamp project) (float-time))
+    project))
 
 (defvar-local ggtags-project 'unset)
 
 (defun ggtags-project-expired-p (project)
-  (> (- (float-time)
-        (ggtags-project-timestamp project))
-     ggtags-project-duration))
+  (or (< (ggtags-project-timestamp project) 0)
+      (> (- (float-time)
+            (ggtags-project-timestamp project))
+         ggtags-project-duration)))
 
 (defun ggtags-project-oversize-p (&optional project)
   (pcase ggtags-oversize-limit
@@ -328,11 +334,10 @@ properly update `ggtags-mode-map'."
 ;;;###autoload
 (defun ggtags-find-project ()
   (if (ggtags-project-p ggtags-project)
-      (if (not (ggtags-project-expired-p ggtags-project))
-          ggtags-project
-        (remhash (ggtags-project-root ggtags-project) ggtags-projects)
-        (kill-local-variable 'ggtags-project)
-        (ggtags-find-project))
+      (if (ggtags-project-expired-p ggtags-project)
+          ;; Update the project info by side-effect.
+          (ggtags-make-project (ggtags-project-root ggtags-project))
+        ggtags-project)
     (let ((root (or (ignore-errors (file-name-as-directory
                                     ;; Resolves symbolic links
                                     (ggtags-process-string "global" "-pr")))
@@ -342,10 +347,11 @@ properly update `ggtags-mode-map'."
                     ;; let's help it out.
                     (when-let (gtags (locate-dominating-file
                                       default-directory "GTAGS"))
-                      (file-truename gtags)))))
+                              (file-truename gtags)))))
       (setq ggtags-project
             (and root (or (gethash root ggtags-projects)
-                          (ggtags-make-project root)))))))
+                          (ggtags-make-project root))))
+      (and ggtags-project (ggtags-find-project)))))
 
 (defun ggtags-current-project-root ()
   (and (ggtags-find-project)
@@ -436,7 +442,11 @@ properly update `ggtags-mode-map'."
   "Update GNU Global tag database.
 Do nothing if GTAGS exceeds the oversize limit unless FORCE is
 non-nil."
-  (interactive "p")
+  (interactive (progn
+                 (ggtags-check-project)
+                 ;; Mark project info expired.
+                 (setf (ggtags-project-timestamp (ggtags-find-project)) -1)
+                 (list t)))
   (when (or force (and (ggtags-find-project)
                        (not (ggtags-project-oversize-p))
                        (ggtags-project-dirty-p (ggtags-find-project))))
