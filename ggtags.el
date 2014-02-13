@@ -1,6 +1,6 @@
 ;;; ggtags.el --- emacs frontend to GNU Global source code tagging system  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013  Free Software Foundation, Inc.
+;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
 ;; Version: 0.7.9
@@ -495,7 +495,7 @@ non-nil."
                           (and ggtags-global-treat-text "--other")
                           (pcase cmd
                             ((pred stringp) cmd)
-                            (`definition "-d")
+                            (`definition "") ;-d not supported by Global 5.7.1
                             (`reference "-r")
                             (`symbol "-s")
                             (`path "--path")
@@ -844,7 +844,7 @@ Global and Emacs."
                                (`"GSYMS"  '("symbol"     "symbols"))
                                (`"GRTAGS" '("reference"  "references"))
                                (`"ID"     '("identifier" "identifiers"))
-                               (_        '("match"      "matches"))))))
+                               (_         '("match"      "matches"))))))
           exit-status)))
 
 ;;; NOTE: Must not match the 'Global started at Mon Jun 3 10:24:13'
