@@ -251,10 +251,6 @@ properly update `ggtags-mode-map'."
     (and (stringp (car xs))
          (ggtags-list-of-string-p (cdr xs)))))
 
-(defun ggtags-get-libpath ()
-  (when-let (path (ggtags-with-process-environment (getenv "GTAGSLIBPATH")))
-    (split-string path (regexp-quote path-separator) t)))
-
 (defun ggtags-process-string (program &rest args)
   (with-temp-buffer
     (let ((exit (apply #'process-file program nil t nil args))
@@ -424,6 +420,10 @@ properly update `ggtags-mode-map'."
                           (list "GTAGSLABEL=ctags")))))
        (unwind-protect (save-current-buffer ,@body)
          (setq ggtags-project ,ggproj)))))
+
+(defun ggtags-get-libpath ()
+  (when-let (path (ggtags-with-current-project (getenv "GTAGSLIBPATH")))
+    (split-string path (regexp-quote path-separator) t)))
 
 (defun ggtags-create-tags (root)
   "Run `gtags' in directory ROOT to create tag files."
