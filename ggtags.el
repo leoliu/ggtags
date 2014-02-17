@@ -657,7 +657,10 @@ If not in navigation mode, do a grep on FROM first.
 
 Note: the regular expression FROM must be supported by both
 Global and Emacs."
-  (interactive (query-replace-read-args "Query replace (regexp)" t t))
+  (interactive
+   ;; Note: in 24.4 query-replace-read-args returns a list of 4 elements.
+   (let ((args (query-replace-read-args "Query replace (regexp)" t t)))
+     (list (nth 0 args) (nth 1 args) (nth 2 args))))
   (unless (bound-and-true-p ggtags-navigation-mode)
     (let ((ggtags-auto-jump-to-first-match nil))
       (ggtags-grep from)))
