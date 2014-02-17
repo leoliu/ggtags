@@ -355,7 +355,7 @@ properly update `ggtags-mode-map'."
   (ggtags-check-project)
   (let* ((inhibit-read-only t)          ; for `add-dir-local-variable'
          (default-directory (ggtags-current-project-root))
-         ;; Not using `ggtags-with-process-environment' to preserve
+         ;; Not using `ggtags-with-current-project' to preserve
          ;; environment variables that may be present in
          ;; `ggtags-process-environment'.
          (process-environment
@@ -402,7 +402,8 @@ properly update `ggtags-mode-map'."
       (message "Project read-only-mode is %s" (if val "on" "off")))
     val))
 
-(defmacro ggtags-with-process-environment (&rest body)
+(defmacro ggtags-with-current-project (&rest body)
+  "Eval BODY in current project's `process-environment'."
   (declare (debug t))
   (let ((gtagsroot (make-symbol "-gtagsroot-"))
         (ggproj (make-symbol "-ggtags-project-")))
@@ -432,7 +433,7 @@ properly update `ggtags-mode-map'."
     (when (zerop (length root)) (error "No root directory provided"))
     (setenv "GTAGSROOT"
             (directory-file-name (file-name-as-directory root)))
-    (ggtags-with-process-environment
+    (ggtags-with-current-project
      (and (not (getenv "GTAGSLABEL"))
           (yes-or-no-p "Use `ctags' backend? ")
           (setenv "GTAGSLABEL" "ctags"))
@@ -455,7 +456,7 @@ non-nil."
   (when (or force (and (ggtags-find-project)
                        (not (ggtags-project-oversize-p))
                        (ggtags-project-dirty-p (ggtags-find-project))))
-    (ggtags-with-process-environment
+    (ggtags-with-current-project
      (with-temp-message "`global -u' in progress..."
        (ggtags-process-string "global" "-u")
        (setf (ggtags-project-dirty-p (ggtags-find-project)) nil)))))
@@ -468,7 +469,7 @@ non-nil."
      (unless (equal prefix (car ggtags-completion-cache))
        (setq ggtags-completion-cache
              (cons prefix
-                   (ggtags-with-process-environment
+                   (ggtags-with-current-project
                     (split-string
                      (apply #'ggtags-process-string
                             "global"
@@ -548,7 +549,7 @@ non-nil."
     (setq ggtags-global-exit-status 0
           ggtags-global-match-count 0)
     (ggtags-update-tags)
-    (ggtags-with-process-environment
+    (ggtags-with-current-project
      (setq ggtags-global-last-buffer
            (compilation-start command 'ggtags-global-mode)))))
 
@@ -716,7 +717,7 @@ Global and Emacs."
   (or (file-exists-p (expand-file-name "HTML" (ggtags-current-project-root)))
       (if (yes-or-no-p "No hypertext form exists; run htags? ")
           (let ((default-directory (ggtags-current-project-root)))
-            (ggtags-with-process-environment (ggtags-process-string "htags")))
+            (ggtags-with-current-project (ggtags-process-string "htags")))
         (user-error "Aborted")))
   (let ((url (ggtags-process-string "gozilla" "-p" (format "+%d" line)
                                     (file-relative-name file))))
@@ -1192,7 +1193,7 @@ Global and Emacs."
     (setf (ggtags-project-dirty-p (ggtags-find-project)) t)
     ;; When oversize update on a per-save basis.
     (when (and buffer-file-name (ggtags-project-oversize-p))
-      (ggtags-with-process-environment
+      (ggtags-with-current-project
        (process-file "global" nil 0 nil "--single-update"
                      (file-relative-name buffer-file-name))))))
 
@@ -1366,7 +1367,7 @@ Global and Emacs."
   (when-let (file (and buffer-file-name (file-relative-name buffer-file-name)))
     (with-temp-buffer
       (when (with-demoted-errors
-              (zerop (ggtags-with-process-environment
+              (zerop (ggtags-with-current-project
                       (process-file "global" nil t nil "-x" "-f" file))))
         (goto-char (point-min))
         (loop while (re-search-forward
