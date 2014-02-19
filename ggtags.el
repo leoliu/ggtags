@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.9
+;; Version: 0.7.10
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -641,14 +641,17 @@ Invert the match when called with a prefix arg \\[universal-argument]."
 (defun ggtags-find-tag-regexp (regexp directory)
   "List tags matching REGEXP in DIRECTORY (default to project root)."
   (interactive
-   (list (ggtags-read-string "POSIX regexp")
-         (if current-prefix-arg
-             (read-directory-name "Directory: " nil nil t)
-           (ggtags-current-project-root))))
+   (progn
+     (ggtags-check-project)
+     (list (ggtags-read-string "POSIX regexp")
+           (if current-prefix-arg
+               (read-directory-name "Directory: " nil nil t)
+             (ggtags-current-project-root)))))
   (ggtags-check-project)
   (let ((root (file-name-as-directory directory))
         (cmd (ggtags-global-build-command
-              nil nil "-l" "--regexp" (prin1-to-string regexp))))
+              nil nil "-l" "--regexp"
+              (prin1-to-string (substring-no-properties regexp)))))
     (ggtags-global-start cmd root)))
 
 (defun ggtags-query-replace (from to &optional delimited)
