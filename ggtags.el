@@ -998,8 +998,7 @@ Global and Emacs."
   (jit-lock-register #'ggtags-abbreviate-files)
   (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
   (add-hook 'compilation-finish-functions 'ggtags-handle-single-match nil t)
-  (add-hook 'kill-buffer-hook (lambda () (ggtags-navigation-mode -1)) nil t)
-  (define-key ggtags-global-mode-map "\M-o" 'visible-mode))
+  (add-hook 'kill-buffer-hook (lambda () (ggtags-navigation-mode -1)) nil t))
 
 ;; NOTE: Need this to avoid putting menu items in
 ;; `emulation-mode-map-alists', which creates double entries. See
