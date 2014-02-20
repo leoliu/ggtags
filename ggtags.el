@@ -274,29 +274,24 @@ properly update `ggtags-mode-map'."
                            (:copier nil)
                            (:type vector)
                            :named)
-  root tag-size has-rtags dirty-p timestamp)
+  root tag-size has-refs dirty-p timestamp)
 
 (defun ggtags-make-project (root)
-  "Create or update project info for ROOT."
   (check-type root string)
-  (let* ((default-directory (file-name-as-directory root))
-         (tag-size (or (nth 7 (file-attributes "GTAGS")) -1))
-         (rtags-size (nth 7 (file-attributes "GRTAGS")))
-         (has-rtags
-          (when rtags-size
-            (or (> rtags-size (* 32 1024))
-                (with-demoted-errors
-                  (not (equal "" (ggtags-process-string "global" "-crs")))))))
-         (project (or (gethash default-directory ggtags-projects)
-                      (puthash default-directory
-                               (ggtags-project--make :root default-directory)
-                               ggtags-projects))))
-    (setf (ggtags-project-has-rtags project) has-rtags
-          (ggtags-project-tag-size project) tag-size
-          (ggtags-project-timestamp project) (float-time))
-    project))
-
-(defvar-local ggtags-project 'unset)
+  (when-let (tag-size (nth 7 (file-attributes (expand-file-name "GTAGS" root))))
+    (let* ((default-directory (file-name-as-directory root))
+           (rtags-size (nth 7 (file-attributes "GRTAGS")))
+           (has-refs
+            (when rtags-size
+              (or (> rtags-size (* 32 1024))
+                  (with-demoted-errors
+                    (not (equal "" (ggtags-process-string "global" "-crs"))))))))
+      (puthash default-directory
+               (ggtags-project--make :root default-directory
+                                     :tag-size tag-size
+                                     :has-refs has-refs
+                                     :timestamp (float-time))
+               ggtags-projects))))
 
 (defun ggtags-project-expired-p (project)
   (or (< (ggtags-project-timestamp project) 0)
@@ -311,27 +306,33 @@ properly update `ggtags-mode-map'."
     (size (when-let (project (or project (ggtags-find-project)))
             (> (ggtags-project-tag-size project) size)))))
 
+(defvar-local ggtags-project-root nil
+  "Internal variable for project root directory.")
+
 ;;;###autoload
 (defun ggtags-find-project ()
-  (if (ggtags-project-p ggtags-project)
-      (if (ggtags-project-expired-p ggtags-project)
-          ;; Update the project info by side-effect.
-          (ggtags-make-project (ggtags-project-root ggtags-project))
-        ggtags-project)
-    (let ((root (or (ignore-errors (file-name-as-directory
-                                    ;; Resolves symbolic links
-                                    (ggtags-process-string "global" "-pr")))
-                    ;; 'global -pr' resolves symlinks before checking
-                    ;; the GTAGS file which could cause issues such as
-                    ;; https://github.com/leoliu/ggtags/issues/22, so
-                    ;; let's help it out.
-                    (when-let (gtags (locate-dominating-file
-                                      default-directory "GTAGS"))
-                      (file-truename gtags)))))
-      (setq ggtags-project
-            (and root (or (gethash root ggtags-projects)
-                          (ggtags-make-project root))))
-      (and ggtags-project (ggtags-find-project)))))
+  (let ((project (gethash ggtags-project-root ggtags-projects)))
+    (if (ggtags-project-p project)
+        (if (ggtags-project-expired-p project)
+            (progn
+              (remhash ggtags-project-root ggtags-projects)
+              (ggtags-find-project))
+          project)
+      (setq ggtags-project-root
+            (or (ignore-errors (file-name-as-directory
+                                ;; Resolves symbolic links
+                                (ggtags-process-string "global" "-pr")))
+                ;; 'global -pr' resolves symlinks before checking
+                ;; the GTAGS file which could cause issues such as
+                ;; https://github.com/leoliu/ggtags/issues/22, so
+                ;; let's help it out.
+                (when-let (gtags (locate-dominating-file
+                                  default-directory "GTAGS"))
+                  (file-truename gtags))))
+      (when ggtags-project-root
+        (or (gethash ggtags-project-root ggtags-projects)
+            (ggtags-make-project ggtags-project-root))
+        (ggtags-find-project)))))
 
 (defun ggtags-current-project-root ()
   (and (ggtags-find-project)
@@ -361,7 +362,7 @@ properly update `ggtags-mode-map'."
          (process-environment
           (append ggtags-process-environment
                   process-environment
-                  (and (not (ggtags-project-has-rtags (ggtags-find-project)))
+                  (and (not (ggtags-project-has-refs (ggtags-find-project)))
                        (list "GTAGSLABEL=ctags"))))
          (envlist (delete-dups
                    (loop for x in process-environment
@@ -406,8 +407,8 @@ properly update `ggtags-mode-map'."
   "Eval BODY in current project's `process-environment'."
   (declare (debug t))
   (let ((gtagsroot (make-symbol "-gtagsroot-"))
-        (ggproj (make-symbol "-ggtags-project-")))
-    `(let* ((,ggproj ggtags-project)
+        (root (make-symbol "-ggtags-project-root-")))
+    `(let* ((,root ggtags-project-root)
             (,gtagsroot (when (ggtags-find-project)
                           (directory-file-name (ggtags-current-project-root))))
             (process-environment
@@ -417,10 +418,10 @@ properly update `ggtags-mode-map'."
                      process-environment
                      (and ,gtagsroot (list (concat "GTAGSROOT=" ,gtagsroot)))
                      (and (ggtags-find-project)
-                          (not (ggtags-project-has-rtags (ggtags-find-project)))
+                          (not (ggtags-project-has-refs (ggtags-find-project)))
                           (list "GTAGSLABEL=ctags")))))
        (unwind-protect (save-current-buffer ,@body)
-         (setq ggtags-project ,ggproj)))))
+         (setq ggtags-project-root ,root)))))
 
 (defun ggtags-get-libpath ()
   (when-let (path (ggtags-with-current-project (getenv "GTAGSLIBPATH")))
@@ -575,7 +576,7 @@ With a prefix arg (non-nil DEFINITION) always find definitions."
   (if (or definition
           (not buffer-file-name)
           (and (ggtags-find-project)
-               (not (ggtags-project-has-rtags (ggtags-find-project)))))
+               (not (ggtags-project-has-refs (ggtags-find-project)))))
       (ggtags-find-tag 'definition name)
     (ggtags-find-tag
      (format "--from-here=%d:%s"
@@ -695,9 +696,7 @@ Global and Emacs."
           (buffer "*GTags File List*"))
       (or files (user-error "No tag files found"))
       (with-output-to-temp-buffer buffer
-        (dolist (file files)
-          (princ file)
-          (princ "\n")))
+        (princ (mapconcat #'identity files "\n")))
       (let ((win (get-buffer-window buffer)))
         (unwind-protect
             (progn
@@ -706,8 +705,7 @@ Global and Emacs."
                 (mapc #'delete-file files)
                 (remhash (ggtags-current-project-root) ggtags-projects)
                 (and (overlayp ggtags-highlight-tag-overlay)
-                     (delete-overlay ggtags-highlight-tag-overlay))
-                (kill-local-variable 'ggtags-project)))
+                     (delete-overlay ggtags-highlight-tag-overlay))))
           (when (window-live-p win)
             (quit-window t win)))))))
 
@@ -1325,9 +1323,7 @@ Global and Emacs."
      "S-down-mouse-1 for definitions\nS-down-mouse-3 for references")
 
 (defun ggtags-highlight-tag-at-point ()
-  (when (and ggtags-mode (eq ggtags-project 'unset))
-    (ggtags-find-project))
-  (when (and ggtags-mode ggtags-project)
+  (when (and ggtags-mode ggtags-project-root (ggtags-find-project))
     (unless (overlayp ggtags-highlight-tag-overlay)
       (setq ggtags-highlight-tag-overlay (make-overlay (point) (point) nil t))
       (overlay-put ggtags-highlight-tag-overlay 'modification-hooks
