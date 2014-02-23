@@ -330,7 +330,9 @@ properly update `ggtags-mode-map'."
                 ;; https://github.com/leoliu/ggtags/issues/22, so
                 ;; let's help it out.
                 (when-let (gtags (locate-dominating-file
-                                  default-directory "GTAGS"))
+                                  default-directory
+                                  (lambda (dir)
+                                    (file-regular-p (expand-file-name "GTAGS" dir)))))
                   (file-truename gtags))))
       (when ggtags-project-root
         (or (gethash ggtags-project-root ggtags-projects)
