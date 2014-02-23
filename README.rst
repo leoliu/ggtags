@@ -26,6 +26,7 @@ Features
 #. Support `exuberant ctags <http://ctags.sourceforge.net/>`_ backend.
 #. Support all Global's output formats: ``grep``, ``ctags-x``,
    ``cscope`` etc.
+#. Support projects on remote hosts (e.g. via ``tramp``)
 
 Why GNU Global
 ~~~~~~~~~~~~~~

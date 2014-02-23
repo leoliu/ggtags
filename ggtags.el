@@ -225,18 +225,6 @@ properly update `ggtags-mode-map'."
 (defvar ggtags-global-error "match"
   "Stem of message to print when no matches are found.")
 
-;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
-(defvar ggtags-global-has-path-style    ; introduced in global 6.2.8
-  (with-demoted-errors                  ; in case `global' not found
-    (zerop (process-file "global" nil nil nil
-                         "--path-style" "shorter" "--help")))
-  "Non-nil if `global' supports --path-style switch.")
-
-;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
-(defvar ggtags-global-has-color
-  (with-demoted-errors
-    (zerop (process-file "global" nil nil nil "--color" "--help"))))
-
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
   `(progn
@@ -276,7 +264,7 @@ properly update `ggtags-mode-map'."
                            (:copier nil)
                            (:type vector)
                            :named)
-  root tag-size has-refs dirty-p timestamp)
+  root tag-size has-refs has-path-style has-color dirty-p timestamp)
 
 (defun ggtags-make-project (root)
   (check-type root string)
@@ -285,13 +273,27 @@ properly update `ggtags-mode-map'."
            (rtags-size (nth 7 (file-attributes "GRTAGS")))
            (has-refs
             (when rtags-size
-              (or (> rtags-size (* 32 1024))
-                  (with-demoted-errors
-                    (not (equal "" (ggtags-process-string "global" "-crs"))))))))
+              (and (or (> rtags-size (* 32 1024))
+                       (with-demoted-errors
+                         (not (equal "" (ggtags-process-string "global" "-crs")))))
+                   'has-refs)))
+           ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
+           (has-path-style
+            (with-demoted-errors        ; in case `global' not found
+              (and (zerop (process-file "global" nil nil nil
+                                        "--path-style" "shorter" "--help"))
+                   'has-path-style)))
+           ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
+           (has-color
+            (with-demoted-errors
+              (and (zerop (process-file "global" nil nil nil "--color" "--help"))
+                   'has-color))))
       (puthash default-directory
                (ggtags-project--make :root default-directory
                                      :tag-size tag-size
                                      :has-refs has-refs
+                                     :has-path-style has-path-style
+                                     :has-color has-color
                                      :timestamp (float-time))
                ggtags-projects))))
 
@@ -519,8 +521,11 @@ non-nil."
   (let ((xs (append (list "global" "-v"
                           (format "--result=%s" ggtags-global-output-format)
                           (and ggtags-global-ignore-case "--ignore-case")
-                          (and ggtags-global-has-color "--color")
-                          (and ggtags-global-has-path-style
+                          (and (ggtags-find-project)
+                               (ggtags-project-has-color (ggtags-find-project))
+                               "--color")
+                          (and (ggtags-find-project)
+                               (ggtags-project-has-path-style (ggtags-find-project))
                                "--path-style=shorter")
                           (and ggtags-global-treat-text "--other")
                           (pcase cmd
