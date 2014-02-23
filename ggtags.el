@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.10
+;; Version: 0.7.11
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -335,11 +335,13 @@ properly update `ggtags-mode-map'."
                                   default-directory
                                   (lambda (dir)
                                     (file-regular-p (expand-file-name "GTAGS" dir)))))
-                  (file-truename gtags))))
+                  ;; `file-truename' may strip the trailing '/' on
+                  ;; remote hosts, see http://debbugs.gnu.org/16851
+                  (file-name-as-directory (file-truename gtags)))))
       (when ggtags-project-root
-        (or (gethash ggtags-project-root ggtags-projects)
-            (ggtags-make-project ggtags-project-root))
-        (ggtags-find-project)))))
+        (if (gethash ggtags-project-root ggtags-projects)
+            (ggtags-find-project)
+          (ggtags-make-project ggtags-project-root))))))
 
 (defun ggtags-current-project-root ()
   (and (ggtags-find-project)

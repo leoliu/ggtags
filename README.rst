@@ -38,9 +38,9 @@ between a few tools.
 Screenshot
 ~~~~~~~~~~
 
-.. figure:: http://i.imgur.com/E5Gr56m.png
+.. figure:: http://i.imgur.com/r9nz3ss.png
    :width: 500px
-   :target: http://i.imgur.com/E5Gr56m.png
+   :target: http://i.imgur.com/r9nz3ss.png
    :alt: ggtags.png
 
 Config
