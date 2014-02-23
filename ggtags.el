@@ -444,8 +444,15 @@ properly update `ggtags-mode-map'."
           (setenv "GTAGSLABEL" "ctags"))
      (with-temp-message "`gtags' in progress..."
        (let ((default-directory (file-name-as-directory root)))
-         (apply #'ggtags-process-string
-                "gtags" (and ggtags-use-idutils '("--idutils"))))))
+         (condition-case err
+             (apply #'ggtags-process-string
+                    "gtags" (and ggtags-use-idutils '("--idutils")))
+           (error (if (and ggtags-use-idutils
+                           (stringp (cadr err))
+                           (string-match-p "mkid not found" (cadr err)))
+                      ;; Retry without mkid
+                      (ggtags-process-string "gtags")
+                    (signal (car err) (cdr err))))))))
     (message "GTAGS generated in `%s'" root)
     root))
 
