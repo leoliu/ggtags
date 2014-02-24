@@ -60,6 +60,7 @@
 
 (require 'compile)
 (require 'etags)
+(require 'tabulated-list)               ;preloaded since 24.3
 
 (eval-when-compile
   (unless (fboundp 'setq-local)
@@ -114,7 +115,7 @@ automatically switches to 'global --single-update'."
 Elements are run through `substitute-env-vars' before use.
 GTAGSROOT will always be expanded to current project root
 directory. This is intended for project-wise ggtags-specific
-process environment settings. Note on remote host (e.g. tramp)
+process environment settings. Note on remote hosts (e.g. tramp)
 directory local variables is not enabled by default per
 `enable-remote-dir-locals' (which see)."
   :safe 'ggtags-list-of-string-p
@@ -310,7 +311,7 @@ properly update `ggtags-mode-map'."
     (size (when-let (project (or project (ggtags-find-project)))
             (> (ggtags-project-tag-size project) size)))))
 
-(defvar-local ggtags-project-root nil
+(defvar-local ggtags-project-root 'unset
   "Internal variable for project root directory.")
 
 ;;;###autoload
@@ -358,6 +359,8 @@ properly update `ggtags-mode-map'."
         ;; Need checking because `ggtags-create-tags' can create tags
         ;; in any directory.
         (ggtags-check-project))))
+
+(defvar delete-trailing-lines)          ;new in 24.3
 
 (defun ggtags-save-project-settings (&optional noconfirm)
   "Save Gnu Global's specific environment variables."
@@ -411,6 +414,11 @@ properly update `ggtags-mode-map'."
     (when (called-interactively-p 'interactive)
       (message "Project read-only-mode is %s" (if val "on" "off")))
     val))
+
+(defun ggtags-visit-project-root ()
+  (interactive)
+  (ggtags-check-project)
+  (dired (ggtags-current-project-root)))
 
 (defmacro ggtags-with-current-project (&rest body)
   "Eval BODY in current project's `process-environment'."
@@ -998,6 +1006,8 @@ Global and Emacs."
      (2 'compilation-error nil t))
     ("^Global found \\([0-9]+\\)" (1 compilation-info-face))))
 
+(defvar compilation-always-kill)        ;new in 24.3
+
 (define-compilation-mode ggtags-global-mode "Global"
   "A mode for showing outputs from gnu global."
   ;; Make it buffer local for `ggtags-abbreviate-files'.
@@ -1235,6 +1245,7 @@ Global and Emacs."
     (define-key m "\M-b" 'ggtags-browse-file-as-hypertext)
     (define-key m "\M-k" 'ggtags-kill-file-buffers)
     (define-key m "\M-h" 'ggtags-view-tag-history)
+    (define-key m "\M-j" 'ggtags-visit-project-root)
     (define-key m (kbd "M-%") 'ggtags-query-replace)
     m))
 
@@ -1262,6 +1273,8 @@ Global and Emacs."
     (define-key menu [toggle-read-only]
       '(menu-item "Toggle project read-only" ggtags-toggle-project-read-only
                   :button (:toggle . buffer-read-only)))
+    (define-key menu [visit-project-root]
+      '(menu-item "Visit project root" ggtags-visit-project-root))
     (define-key menu [sep2] menu-bar-separator)
     (define-key menu [browse-hypertext]
       '(menu-item "Browse as hypertext" ggtags-browse-file-as-hypertext
