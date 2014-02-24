@@ -590,9 +590,9 @@ non-nil."
       (ignore-errors (compilation-next-error 1))
       (compile-goto-error))))
 
-(defun ggtags-find-tag (cmd name)
+(defun ggtags-find-tag (cmd &rest args)
   (ggtags-check-project)
-  (ggtags-global-start (ggtags-global-build-command cmd name)))
+  (ggtags-global-start (apply #'ggtags-global-build-command cmd args)))
 
 ;;;###autoload
 (defun ggtags-find-tag-dwim (name &optional definition)
@@ -636,10 +636,12 @@ With a prefix arg (non-nil DEFINITION) always find definitions."
                     (substring prompt 0 (match-beginning 0))
                   prompt))
         (default (ggtags-tag-at-point)))
-    (read-string (format (if default "%s (default `%s'): "
-                           "%s: ")
+    (read-string (format (if default "%s (default `%s'): " "%s: ")
                          prompt default)
-                 nil nil (and default (substring-no-properties default)))))
+                 nil nil default)))
+
+(defun ggtags-quote-pattern (pattern)
+  (prin1-to-string (substring-no-properties pattern)))
 
 (defun ggtags-grep (pattern &optional invert-match)
   "Use `global --grep' to search for lines matching PATTERN.
@@ -648,13 +650,12 @@ Invert the match when called with a prefix arg \\[universal-argument]."
                                              "Inverted grep pattern"
                                            "Grep pattern"))
                      current-prefix-arg))
-  (ggtags-find-tag 'grep (format "%s--regexp %S"
-                                 (if invert-match "--invert-match " "")
-                                 pattern)))
+  (ggtags-find-tag 'grep (and invert-match "--invert-match")
+                   "--" (ggtags-quote-pattern pattern)))
 
 (defun ggtags-idutils-query (pattern)
   (interactive (list (ggtags-read-string "ID query pattern")))
-  (ggtags-find-tag 'idutils (format "--regexp %S" pattern)))
+  (ggtags-find-tag 'idutils "--" (ggtags-quote-pattern pattern)))
 
 (defun ggtags-find-file (pattern &optional invert-match)
   (interactive (list (ggtags-read-string (if current-prefix-arg
@@ -662,9 +663,8 @@ Invert the match when called with a prefix arg \\[universal-argument]."
                                            "Path pattern"))
                      current-prefix-arg))
   (let ((ggtags-global-output-format 'path))
-    (ggtags-find-tag 'path (format "%s--regexp %S"
-                                   (if invert-match "--invert-match " "")
-                                   pattern))))
+    (ggtags-find-tag 'path (and invert-match "--invert-match")
+                     "--" (ggtags-quote-pattern pattern))))
 
 ;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
 (defun ggtags-find-tag-regexp (regexp directory)
@@ -677,11 +677,9 @@ Invert the match when called with a prefix arg \\[universal-argument]."
                (read-directory-name "Directory: " nil nil t)
              (ggtags-current-project-root)))))
   (ggtags-check-project)
-  (let ((root (file-name-as-directory directory))
-        (cmd (ggtags-global-build-command
-              nil nil "-l" "--regexp"
-              (prin1-to-string (substring-no-properties regexp)))))
-    (ggtags-global-start cmd root)))
+  (ggtags-global-start
+   (ggtags-global-build-command nil nil "-l" "--" (ggtags-quote-pattern regexp))
+   (file-name-as-directory directory)))
 
 (defun ggtags-query-replace (from to &optional delimited)
   "Query replace FROM with TO on files in the Global buffer.
@@ -894,6 +892,7 @@ Global and Emacs."
                                (`"GTAGS"  '("definition" "definitions"))
                                (`"GSYMS"  '("symbol"     "symbols"))
                                (`"GRTAGS" '("reference"  "references"))
+                               (`"GPATH"  '("file"  "files"))
                                (`"ID"     '("identifier" "identifiers"))
                                (_         '("match"      "matches"))))))
           exit-status)))
