@@ -897,22 +897,29 @@ Global and Emacs."
                                (_         '("match"      "matches"))))))
           exit-status)))
 
+(defun ggtags-global-column (start)
+  ;; START is the beginning position of source text.
+  (when-let (mbeg (text-property-any start (line-end-position) 'global-color t))
+    (setq ggtags-current-tag-name nil)
+    (- mbeg start)))
+
 ;;; NOTE: Must not match the 'Global started at Mon Jun 3 10:24:13'
 ;;; line or `compilation-auto-jump' will jump there and fail. See
 ;;; comments before the 'gnu' entry in
 ;;; `compilation-error-regexp-alist-alist'.
 (defvar ggtags-global-error-regexp-alist-alist
   (append
-   '((path "^\\(?:[^/\n]*/\\)?[^ )\t\n]+$" 0)
+   `((path "^\\(?:[^/\n]*/\\)?[^ )\t\n]+$" 0)
      ;; ACTIVE_ESCAPE	src/dialog.cc	172
      (ctags "^\\([^ \t\n]+\\)[ \t]+\\(.*?\\)[ \t]+\\([0-9]+\\)$"
             2 3 nil nil 2 (1 font-lock-function-name-face))
      ;; ACTIVE_ESCAPE     172 src/dialog.cc    #undef ACTIVE_ESCAPE
      (ctags-x "^\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\)[ \t]+\\(\\(?:[^/\n]*/\\)?[^ \t\n]+\\)"
-              3 2 nil nil 3 (1 font-lock-function-name-face))
+              3 2 (,(lambda () (ggtags-global-column (1+ (match-end 0)))))
+              nil 3 (1 font-lock-function-name-face))
      ;; src/dialog.cc:172:#undef ACTIVE_ESCAPE
      (grep "^\\(.+?\\):\\([0-9]+\\):\\(?:$\\|[^0-9\n]\\|[0-9][^0-9\n]\\|[0-9][0-9].\\)"
-           1 2 nil nil 1)
+           1 2 (,(lambda () (ggtags-global-column (1+ (match-end 2))))) nil 1)
      ;; src/dialog.cc ACTIVE_ESCAPE 172 #undef ACTIVE_ESCAPE
      (cscope "^\\(.+?\\)[ \t]+\\([^ \t\n]+\\)[ \t]+\\([0-9]+\\).*\\(?:[^0-9\n]\\|[^0-9\n][0-9]\\|[^:\n][0-9][0-9]\\)$"
              1 3 nil nil 1 (2 font-lock-function-name-face)))
@@ -962,7 +969,12 @@ Global and Emacs."
 
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
-  (ansi-color-apply-on-region compilation-filter-start (point))
+  (let ((ansi-color-apply-face-function
+         (lambda (beg end face)
+           (when face
+             (ansi-color-apply-overlay-face beg end face)
+             (put-text-property beg end 'global-color t)))))
+    (ansi-color-apply-on-region compilation-filter-start (point)))
   ;; Get rid of line "Using config file '/PATH/TO/.globalrc'." or
   ;; "Using default configuration."
   (when (re-search-backward
@@ -1016,6 +1028,9 @@ Global and Emacs."
   (setq-local compilation-auto-jump-to-first-error
               ggtags-auto-jump-to-first-match)
   (setq-local compilation-scroll-output 'first-error)
+  ;; See `compilation-move-to-column' for details.
+  (setq-local compilation-first-column 0)
+  (setq-local compilation-error-screen-columns nil)
   (setq-local compilation-disable-input t)
   (setq-local compilation-always-kill t)
   (setq-local compilation-error-face 'compilation-info)
