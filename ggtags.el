@@ -1360,8 +1360,13 @@ Global and Emacs."
 
 (defvar ggtags-highlight-tag-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [S-down-mouse-1] 'ggtags-find-tag-dwim)
-    (define-key map [S-down-mouse-3] 'ggtags-find-reference)
+    ;; Bind down- events so that the global keymap won't ``shine
+    ;; through''. See `mode-line-buffer-identification-keymap' for
+    ;; similar workaround.
+    (define-key map [S-mouse-1] 'ggtags-find-tag-dwim)
+    (define-key map [S-down-mouse-1] 'ignore)
+    (define-key map [S-mouse-3] 'ggtags-find-reference)
+    (define-key map [S-down-mouse-3] 'ignore)
     map)
   "Keymap used for valid tag at point.")
 
@@ -1369,7 +1374,7 @@ Global and Emacs."
 (put 'ggtags-active-tag 'keymap ggtags-highlight-tag-map)
 ;; (put 'ggtags-active-tag 'mouse-face 'match)
 (put 'ggtags-active-tag 'help-echo
-     "S-down-mouse-1 for definitions\nS-down-mouse-3 for references")
+     "S-mouse-1 for definitions\nS-mouse-3 for references")
 
 (defun ggtags-highlight-tag-at-point ()
   (when (and ggtags-mode ggtags-project-root (ggtags-find-project))
