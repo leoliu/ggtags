@@ -105,7 +105,7 @@ automatically switches to 'global --single-update'."
                  number)
   :group 'ggtags)
 
-(defcustom ggtags-project-duration 3600
+(defcustom ggtags-project-duration 600
   "Seconds to keep information of a project in memory."
   :type 'number
   :group 'ggtags)
@@ -175,6 +175,12 @@ If an integer abbreviate only names longer than that number."
 (defcustom ggtags-global-large-output 1000
   "Number of lines in the Global buffer to indicate large output."
   :type 'number
+  :group 'ggtags)
+
+(defcustom ggtags-global-next-error-hook nil
+  "Hook run immediately after finding a tag."
+  :options '(reposition-window recenter)
+  :type 'hook
   :group 'ggtags)
 
 (defcustom ggtags-mode-prefix-key "\C-c"
@@ -1172,7 +1178,7 @@ Global and Emacs."
 
 (defvar ggtags-global-line-overlay nil)
 
-(defun ggtags-global-next-error-hook ()
+(defun ggtags-global-next-error-function ()
   (ggtags-move-to-tag)
   (ggtags-global-save-start-marker)
   (ignore-errors
@@ -1182,7 +1188,8 @@ Global and Emacs."
         (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
       (move-overlay ggtags-global-line-overlay
                     (line-beginning-position) (line-end-position)
-                    (current-buffer)))))
+                    (current-buffer))))
+  (run-hooks 'ggtags-global-next-error-hook))
 
 (define-minor-mode ggtags-navigation-mode nil
   :lighter
@@ -1206,9 +1213,9 @@ Global and Emacs."
   :global t
   (if ggtags-navigation-mode
       (progn
-        (add-hook 'next-error-hook 'ggtags-global-next-error-hook)
+        (add-hook 'next-error-hook 'ggtags-global-next-error-function)
         (add-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function))
-    (remove-hook 'next-error-hook 'ggtags-global-next-error-hook)
+    (remove-hook 'next-error-hook 'ggtags-global-next-error-function)
     (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function)))
 
 (defun ggtags-minibuffer-setup-function ()
