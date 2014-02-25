@@ -450,8 +450,8 @@ properly update `ggtags-mode-map'."
   (interactive "DRoot directory: ")
   (let ((process-environment process-environment))
     (when (zerop (length root)) (error "No root directory provided"))
-    (setenv "GTAGSROOT"
-            (directory-file-name (file-name-as-directory root)))
+    (setenv "GTAGSROOT" (expand-file-name
+                         (directory-file-name (file-name-as-directory root))))
     (ggtags-with-current-project
      (and (not (getenv "GTAGSLABEL"))
           (yes-or-no-p "Use `ctags' backend? ")
@@ -892,7 +892,7 @@ Global and Emacs."
                                (`"GTAGS"  '("definition" "definitions"))
                                (`"GSYMS"  '("symbol"     "symbols"))
                                (`"GRTAGS" '("reference"  "references"))
-                               (`"GPATH"  '("file"  "files"))
+                               (`"GPATH"  '("file"       "files"))
                                (`"ID"     '("identifier" "identifiers"))
                                (_         '("match"      "matches"))))))
           exit-status)))
