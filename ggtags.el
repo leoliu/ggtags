@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.11
+;; Version: 0.7.12
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -271,44 +271,58 @@ properly update `ggtags-mode-map'."
                            (:copier nil)
                            (:type vector)
                            :named)
-  root tag-size has-refs has-path-style has-color dirty-p timestamp)
+  root tag-size has-refs has-path-style has-color dirty-p mtime timestamp)
 
 (defun ggtags-make-project (root)
   (check-type root string)
-  (when-let (tag-size (nth 7 (file-attributes (expand-file-name "GTAGS" root))))
-    (let* ((default-directory (file-name-as-directory root))
-           (rtags-size (nth 7 (file-attributes "GRTAGS")))
-           (has-refs
-            (when rtags-size
-              (and (or (> rtags-size (* 32 1024))
-                       (with-demoted-errors
-                         (not (equal "" (ggtags-process-string "global" "-crs")))))
-                   'has-refs)))
-           ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
-           (has-path-style
-            (with-demoted-errors        ; in case `global' not found
-              (and (zerop (process-file "global" nil nil nil
-                                        "--path-style" "shorter" "--help"))
-                   'has-path-style)))
-           ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
-           (has-color
-            (with-demoted-errors
-              (and (zerop (process-file "global" nil nil nil "--color" "--help"))
-                   'has-color))))
-      (puthash default-directory
-               (ggtags-project--make :root default-directory
-                                     :tag-size tag-size
-                                     :has-refs has-refs
-                                     :has-path-style has-path-style
-                                     :has-color has-color
-                                     :timestamp (float-time))
-               ggtags-projects))))
+  (pcase (nthcdr 5 (file-attributes (expand-file-name "GTAGS" root)))
+    (`(,mtime ,_ ,tag-size . ,_)
+     (let* ((default-directory (file-name-as-directory root))
+            (rtags-size (nth 7 (file-attributes "GRTAGS")))
+            (has-refs
+             (when rtags-size
+               (and (or (> rtags-size (* 32 1024))
+                        (with-demoted-errors
+                          (not (equal "" (ggtags-process-string "global" "-crs")))))
+                    'has-refs)))
+            ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
+            (has-path-style
+             (with-demoted-errors       ; in case `global' not found
+               (and (zerop (process-file "global" nil nil nil
+                                         "--path-style" "shorter" "--help"))
+                    'has-path-style)))
+            ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
+            (has-color
+             (with-demoted-errors
+               (and (zerop (process-file "global" nil nil nil "--color" "--help"))
+                    'has-color))))
+       (puthash default-directory
+                (ggtags-project--make :root default-directory
+                                      :tag-size tag-size
+                                      :has-refs has-refs
+                                      :has-path-style has-path-style
+                                      :has-color has-color
+                                      :mtime (float-time mtime)
+                                      :timestamp (float-time))
+                ggtags-projects)))))
 
 (defun ggtags-project-expired-p (project)
   (or (< (ggtags-project-timestamp project) 0)
       (> (- (float-time)
             (ggtags-project-timestamp project))
          ggtags-project-duration)))
+
+(defun ggtags-project-update-mtime-maybe (&optional project)
+  "Update PROJECT's modtime and if current file is newer.
+Value is new modtime if updated."
+  (let ((project (or project (ggtags-find-project))))
+    (when (and (ggtags-project-p project)
+               (consp (visited-file-modtime))
+               (> (float-time (visited-file-modtime))
+                  (ggtags-project-mtime project)))
+      (setf (ggtags-project-dirty-p project) t)
+      (setf (ggtags-project-mtime project)
+            (float-time (visited-file-modtime))))))
 
 (defun ggtags-project-oversize-p (&optional project)
   (pcase ggtags-oversize-limit
@@ -491,7 +505,8 @@ non-nil."
     (ggtags-with-current-project
      (with-temp-message "`global -u' in progress..."
        (ggtags-process-string "global" "-u")
-       (setf (ggtags-project-dirty-p (ggtags-find-project)) nil)))))
+       (setf (ggtags-project-dirty-p (ggtags-find-project)) nil)
+       (setf (ggtags-project-mtime (ggtags-find-project)) (float-time))))))
 
 (defvar-local ggtags-completion-cache nil)
 
@@ -1181,14 +1196,17 @@ Global and Emacs."
 (defun ggtags-global-next-error-function ()
   (ggtags-move-to-tag)
   (ggtags-global-save-start-marker)
+  (and (ggtags-project-update-mtime-maybe)
+       (message "File `%s' is newer than GTAGS"
+                (file-name-nondirectory buffer-file-name)))
   (ignore-errors
     (ggtags-ensure-global-buffer
-      (unless (overlayp ggtags-global-line-overlay)
-        (setq ggtags-global-line-overlay (make-overlay (point) (point)))
-        (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
-      (move-overlay ggtags-global-line-overlay
-                    (line-beginning-position) (line-end-position)
-                    (current-buffer))))
+     (unless (overlayp ggtags-global-line-overlay)
+       (setq ggtags-global-line-overlay (make-overlay (point) (point)))
+       (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
+     (move-overlay ggtags-global-line-overlay
+                   (line-beginning-position) (line-end-position)
+                   (current-buffer))))
   (run-hooks 'ggtags-global-next-error-hook))
 
 (define-minor-mode ggtags-navigation-mode nil
@@ -1246,7 +1264,7 @@ Global and Emacs."
 
 (defun ggtags-after-save-function ()
   (when (ggtags-find-project)
-    (setf (ggtags-project-dirty-p (ggtags-find-project)) t)
+    (ggtags-project-update-mtime-maybe)
     ;; When oversize update on a per-save basis.
     (when (and buffer-file-name (ggtags-project-oversize-p))
       (ggtags-with-current-project
