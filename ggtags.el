@@ -554,7 +554,7 @@ non-nil."
                           (and ggtags-global-ignore-case "--ignore-case")
                           (and (ggtags-find-project)
                                (ggtags-project-has-color (ggtags-find-project))
-                               "--color")
+                               "--color=always")
                           (and (ggtags-find-project)
                                (ggtags-project-has-path-style (ggtags-find-project))
                                "--path-style=shorter")
