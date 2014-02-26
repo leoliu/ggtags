@@ -183,6 +183,12 @@ If an integer abbreviate only names longer than that number."
   :type 'hook
   :group 'ggtags)
 
+(defcustom ggtags-mode-sticky t
+  "If non-nil enable Ggtags Mode in files visited."
+  :safe 'booleanp
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-mode-prefix-key "\C-c"
   "Key binding used for `ggtags-mode-prefix-map'.
 Users should change the value using `customize-variable' to
@@ -1199,6 +1205,7 @@ Global and Emacs."
   (and (ggtags-project-update-mtime-maybe)
        (message "File `%s' is newer than GTAGS"
                 (file-name-nondirectory buffer-file-name)))
+  (and ggtags-mode-sticky (ggtags-mode 1))
   (ignore-errors
     (ggtags-ensure-global-buffer
      (unless (overlayp ggtags-global-line-overlay)
