@@ -472,7 +472,10 @@ Value is new modtime if updated."
             (split-string path (regexp-quote path-separator) t))))
 
 (defun ggtags-create-tags (root)
-  "Run `gtags' in directory ROOT to create tag files."
+  "Create tag files (e.g. GTAGS) in directory ROOT.
+If file gtags.files exists in ROOT, it should be a list of source
+files to index, which can be used to speed gtags up in large
+source trees. See Info node `(global)gtags' for details."
   (interactive "DRoot directory: ")
   (let ((process-environment process-environment))
     (when (zerop (length root)) (error "No root directory provided"))

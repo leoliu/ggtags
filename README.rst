@@ -14,6 +14,7 @@ Features
 
 #. Automatically update Global's tag files when needed with tuning for
    large source trees.
+#. Read tag with completion.
 #. Build on ``compile.el`` for asynchronicity and its large
    feature-set.
 #. Intuitive navigation among multiple matches with mode-line display
