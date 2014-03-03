@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.7.12
+;; Version: 0.8.0
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -177,10 +177,16 @@ If an integer abbreviate only names longer than that number."
   :type 'number
   :group 'ggtags)
 
-(defcustom ggtags-global-next-error-hook nil
+(defcustom ggtags-find-tag-hook nil
   "Hook run immediately after finding a tag."
-  :options '(reposition-window recenter)
+  :options '(recenter reposition-window)
   :type 'hook
+  :group 'ggtags)
+
+(defcustom ggtags-show-definition-function #'ggtags-show-definition-default
+  "Function called by `ggtags-show-definition' to show definition.
+It is passed a list of definnition candidates."
+  :type 'function
   :group 'ggtags)
 
 (defcustom ggtags-mode-sticky t
@@ -1217,7 +1223,7 @@ Global and Emacs."
      (move-overlay ggtags-global-line-overlay
                    (line-beginning-position) (line-end-position)
                    (current-buffer))))
-  (run-hooks 'ggtags-global-next-error-hook))
+  (run-hooks 'ggtags-find-tag-hook))
 
 (define-minor-mode ggtags-navigation-mode nil
   :lighter
@@ -1281,6 +1287,53 @@ Global and Emacs."
        (process-file "global" nil 0 nil "--single-update"
                      (file-relative-name buffer-file-name))))))
 
+(defun ggtags-global-output (cmds buffer callback &optional cutoff)
+  "Asynchrously pipe the output of CMDS to BUFFER.
+Invoke CALLBACK in BUFFER with process exit status when finished."
+  (or buffer (error "Output buffer required"))
+  (let* ((default-directory (or (ggtags-current-project-root) default-directory))
+         (program (car cmds))
+         (args (cdr cmds))
+         (cutoff (+ cutoff (if (get-buffer buffer)
+                               (with-current-buffer buffer
+                                 (line-number-at-pos (point-max)))
+                             0)))
+         (proc (apply #'start-file-process program buffer program args))
+         (filter (lambda (proc string)
+                   (and (buffer-live-p (process-buffer proc))
+                        (with-current-buffer (process-buffer proc)
+                          (goto-char (process-mark proc))
+                          (insert string)
+                          (when (and (> (line-number-at-pos (point-max)) cutoff)
+                                     (process-live-p proc))
+                            (interrupt-process (current-buffer)))))))
+         (sentinel (lambda (proc _msg)
+                     (when (memq (process-status proc) '(exit signal))
+                       (with-current-buffer (process-buffer proc)
+                         (set-process-buffer proc nil)
+                         (funcall callback (process-status proc)))))))
+    (set-process-query-on-exit-flag proc nil)
+    (and cutoff (set-process-filter proc filter))
+    (set-process-sentinel proc sentinel)
+    proc))
+
+(defun ggtags-show-definition-default (defs)
+  (let (message-log-max)
+    (message "%s" (or (car defs) "[definition not found]"))))
+
+(defun ggtags-show-definition (name)
+  (interactive (list (ggtags-read-tag)))
+  (let* ((re (cadr (assq 'grep ggtags-global-error-regexp-alist-alist)))
+         (buffer (get-buffer-create " *ggtags-output*"))
+         (fn ggtags-show-definition-function)
+         (show (lambda (_status)
+                 (goto-char (point-min))
+                 (funcall fn (loop while (re-search-forward re nil t)
+                                   collect (buffer-substring (1+ (match-end 2))
+                                                             (line-end-position))))
+                 (kill-buffer buffer))))
+    (ggtags-global-output (list "global" "--result=grep" name) buffer show 30)))
+
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
     (define-key m "\M-'" 'previous-error)
@@ -1296,6 +1349,7 @@ Global and Emacs."
     (define-key m "\M-h" 'ggtags-view-tag-history)
     (define-key m "\M-j" 'ggtags-visit-project-root)
     (define-key m (kbd "M-%") 'ggtags-query-replace)
+    (define-key m "\M-?" 'ggtags-show-definition)
     m))
 
 (defvar ggtags-mode-map
@@ -1360,6 +1414,8 @@ Global and Emacs."
       '(menu-item "Find other symbol" ggtags-find-other-symbol))
     (define-key menu [find-tag-regexp]
       '(menu-item "Find tag matching regexp" ggtags-find-tag-regexp))
+    (define-key menu [show-definition]
+      '(menu-item "Show definition" ggtags-show-definition))
     (define-key menu [find-reference]
       '(menu-item "Find reference" ggtags-find-reference))
     (define-key menu [find-tag-continue]
