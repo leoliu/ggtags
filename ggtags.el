@@ -185,7 +185,11 @@ If an integer abbreviate only names longer than that number."
 
 (defcustom ggtags-show-definition-function #'ggtags-show-definition-default
   "Function called by `ggtags-show-definition' to show definition.
-It is passed a list of definnition candidates."
+It is passed a list of definnition candidates of the form:
+
+ (TEXT NAME FILE LINE)
+
+where TEXT is usually the source line of the definition."
   :type 'function
   :group 'ggtags)
 
@@ -1319,7 +1323,7 @@ Invoke CALLBACK in BUFFER with process exit status when finished."
 
 (defun ggtags-show-definition-default (defs)
   (let (message-log-max)
-    (message "%s" (or (car defs) "[definition not found]"))))
+    (message "%s" (or (caar defs) "[definition not found]"))))
 
 (defun ggtags-show-definition (name)
   (interactive (list (ggtags-read-tag)))
@@ -1329,10 +1333,15 @@ Invoke CALLBACK in BUFFER with process exit status when finished."
          (show (lambda (_status)
                  (goto-char (point-min))
                  (funcall fn (loop while (re-search-forward re nil t)
-                                   collect (buffer-substring (1+ (match-end 2))
-                                                             (line-end-position))))
+                                   collect (list (buffer-substring (1+ (match-end 2))
+                                                                   (line-end-position))
+                                                 name
+                                                 (match-string 1)
+                                                 (string-to-number (match-string 2)))))
                  (kill-buffer buffer))))
-    (ggtags-global-output (list "global" "--result=grep" name) buffer show 30)))
+    (ggtags-global-output
+     (list "global" "--result=grep" "--path-style=absolute" name)
+     buffer show 100)))
 
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
