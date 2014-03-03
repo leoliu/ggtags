@@ -1007,6 +1007,8 @@ Global and Emacs."
              (w (display-buffer (current-buffer) '(nil (allow-no-window . t)))))
         (and w (compilation-set-window-height w))))))
 
+(defvar ggtags-navigation-mode)
+
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
   (let ((ansi-color-apply-face-function
@@ -1023,7 +1025,7 @@ Global and Emacs."
     (replace-match ""))
   (incf ggtags-global-output-lines
         (count-lines compilation-filter-start (point)))
-  (when (> ggtags-global-output-lines 5)
+  (when (and (> ggtags-global-output-lines 5) (not ggtags-navigation-mode))
     (ggtags-global--display-buffer))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
