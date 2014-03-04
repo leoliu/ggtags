@@ -940,7 +940,6 @@ Global and Emacs."
 (defun ggtags-global-column (start)
   ;; START is the beginning position of source text.
   (when-let (mbeg (text-property-any start (line-end-position) 'global-color t))
-    (setq ggtags-current-tag-name nil)
     (- mbeg start)))
 
 ;;; NOTE: Must not match the 'Global started at Mon Jun 3 10:24:13'
@@ -1144,15 +1143,22 @@ Global and Emacs."
 
 (defun ggtags-move-to-tag (&optional name)
   "Move to NAME tag in current line."
-  (let ((orig (point))
-        (tag (or name ggtags-current-tag-name)))
-    (beginning-of-line)
-    (if (and tag (re-search-forward
-                  (concat "\\_<" (regexp-quote tag) "\\_>")
-                  (line-end-position)
-                  t))
-        (goto-char (match-beginning 0))
-      (goto-char orig))))
+  (let ((tag (or name ggtags-current-tag-name)))
+    ;; Do nothing if on the tag already i.e. by `ggtags-global-column'.
+    (unless (or (not tag) (looking-at (concat (regexp-quote tag) "\\_>")))
+      (let ((orig (point))
+            (regexps (mapcar (lambda (fmtstr)
+                               (format fmtstr (regexp-quote tag)))
+                             '("\\_<%s\\_>" "%s\\_>" "%s"))))
+        (beginning-of-line)
+        (if (loop for re in regexps
+                  ;; Note: tag might not agree with current
+                  ;; major-mode's symbol, so try harder. For
+                  ;; example, in `php-mode' $cacheBackend is
+                  ;; a symbol, but cacheBackend is a tag.
+                  thereis (re-search-forward re (line-end-position) t))
+            (goto-char (match-beginning 0))
+          (goto-char orig))))))
 
 (defun ggtags-navigation-mode-cleanup (&optional buf time)
   (let ((buf (or buf ggtags-global-last-buffer)))
