@@ -529,21 +529,26 @@ non-nil."
 
 (defvar-local ggtags-completion-cache nil)
 
+(defvar ggtags-completion-flag "")      ;internal use
+
 (defvar ggtags-completion-table
   (completion-table-dynamic
    (lambda (prefix)
-     (unless (equal prefix (car ggtags-completion-cache))
-       (setq ggtags-completion-cache
-             (cons prefix
-                   (ggtags-with-current-project
-                    (split-string
-                     (apply #'ggtags-process-string
-                            "global"
-                            ;; Note -c alone returns only definitions
-                            (if completion-ignore-case
-                                (list "--ignore-case" "-Tc" prefix)
-                              (list "-Tc" prefix)))
-                     "\n" t)))))
+     (let ((cache-key (concat prefix "$" ggtags-completion-flag)))
+       (unless (equal cache-key (car ggtags-completion-cache))
+         (setq ggtags-completion-cache
+               (cons cache-key
+                     (ignore-errors
+                       ;; May throw global: only name char is allowed
+                       ;; with -c option.
+                       (ggtags-with-current-project
+                        (split-string
+                         (apply #'ggtags-process-string
+                                "global"
+                                (append (and completion-ignore-case '("--ignore-case"))
+                                        ;; Note -c alone returns only definitions
+                                        (list (concat "-c" ggtags-completion-flag) prefix)))
+                         "\n" t)))))))
      (cdr ggtags-completion-cache))))
 
 (defun ggtags-completion-at-point ()
@@ -552,16 +557,25 @@ non-nil."
     (and (< (car bounds) (cdr bounds))
          (list (car bounds) (cdr bounds) ggtags-completion-table))))
 
-(defun ggtags-read-tag ()
+(defun ggtags-read-tag (&optional type confirm prompt require-match default)
   (ggtags-ensure-project)
-  (let ((default (ggtags-tag-at-point))
-        (completing-read-function ggtags-completing-read-function))
+  (let ((default (or default (ggtags-tag-at-point)))
+        (completing-read-function ggtags-completing-read-function)
+        (prompt (or prompt (capitalize (symbol-name (or type 'tag)))))
+        (ggtags-completion-flag (pcase type
+                                  (`(or nil definition) "T")
+                                  (`symbol "s")
+                                  (`reference "r")
+                                  (`id "I")
+                                  (`path "P")
+                                  ((pred stringp) type)
+                                  (_ ggtags-completion-flag))))
     (setq ggtags-current-tag-name
-          (cond (current-prefix-arg
+          (cond (confirm
                  (ggtags-update-tags)
                  (completing-read
-                  (format (if default "Tag (default %s): " "Tag: ") default)
-                  ggtags-completion-table nil t nil nil default))
+                  (format (if default "%s (default %s): " "%s: ") prompt default)
+                  ggtags-completion-table nil require-match nil nil default))
                 ((not default)
                  (user-error "No tag at point"))
                 (t (substring-no-properties default))))))
@@ -639,7 +653,8 @@ non-nil."
   "Find definitions or references of tag NAME by context.
 If point is at a definition tag, find references, and vice versa.
 With a prefix arg (non-nil DEFINITION) always find definitions."
-  (interactive (list (ggtags-read-tag) current-prefix-arg))
+  (interactive (list (ggtags-read-tag 'definition current-prefix-arg)
+                     current-prefix-arg))
   (ggtags-check-project)     ; for `ggtags-current-project-root' below
   (if (or definition
           (not buffer-file-name)
@@ -661,46 +676,36 @@ With a prefix arg (non-nil DEFINITION) always find definitions."
      name)))
 
 (defun ggtags-find-reference (name)
-  (interactive (list (ggtags-read-tag)))
+  (interactive (list (ggtags-read-tag 'reference current-prefix-arg)))
   (ggtags-find-tag 'reference name))
 
 (defun ggtags-find-other-symbol (name)
   "Find tag NAME that is a reference without a definition."
-  (interactive (list (ggtags-read-tag)))
+  (interactive (list (ggtags-read-tag 'symbol current-prefix-arg)))
   (ggtags-find-tag 'symbol name))
-
-(defun ggtags-read-string (prompt)
-  "Like `read-string' but handle default automatically."
-  (ggtags-ensure-project)
-  (let ((prompt (if (string-match ": *\\'" prompt)
-                    (substring prompt 0 (match-beginning 0))
-                  prompt))
-        (default (ggtags-tag-at-point)))
-    (read-string (format (if default "%s (default `%s'): " "%s: ")
-                         prompt default)
-                 nil nil default)))
 
 (defun ggtags-quote-pattern (pattern)
   (prin1-to-string (substring-no-properties pattern)))
 
+(defun ggtags-idutils-query (pattern)
+  (interactive (list (ggtags-read-tag 'id t)))
+  (ggtags-find-tag 'idutils "--" (ggtags-quote-pattern pattern)))
+
 (defun ggtags-grep (pattern &optional invert-match)
   "Use `global --grep' to search for lines matching PATTERN.
 Invert the match when called with a prefix arg \\[universal-argument]."
-  (interactive (list (ggtags-read-string (if current-prefix-arg
-                                             "Inverted grep pattern"
-                                           "Grep pattern"))
+  (interactive (list (ggtags-read-tag 'definition 'confirm
+                                      (if current-prefix-arg
+                                          "Inverted grep pattern" "Grep pattern"))
                      current-prefix-arg))
   (ggtags-find-tag 'grep (and invert-match "--invert-match")
                    "--" (ggtags-quote-pattern pattern)))
 
-(defun ggtags-idutils-query (pattern)
-  (interactive (list (ggtags-read-string "ID query pattern")))
-  (ggtags-find-tag 'idutils "--" (ggtags-quote-pattern pattern)))
-
 (defun ggtags-find-file (pattern &optional invert-match)
-  (interactive (list (ggtags-read-string (if current-prefix-arg
-                                             "Inverted path pattern"
-                                           "Path pattern"))
+  (interactive (list (ggtags-read-tag 'path 'confirm (if current-prefix-arg
+                                                         "Inverted path pattern"
+                                                       "Path pattern")
+                                      nil (thing-at-point 'filename))
                      current-prefix-arg))
   (let ((ggtags-global-output-format 'path))
     (ggtags-find-tag 'path (and invert-match "--invert-match")
@@ -712,7 +717,7 @@ Invert the match when called with a prefix arg \\[universal-argument]."
   (interactive
    (progn
      (ggtags-check-project)
-     (list (ggtags-read-string "POSIX regexp")
+     (list (ggtags-read-tag "" t "POSIX regexp")
            (if current-prefix-arg
                (read-directory-name "Directory: " nil nil t)
              (ggtags-current-project-root)))))
@@ -948,7 +953,7 @@ Global and Emacs."
 ;;; `compilation-error-regexp-alist-alist'.
 (defvar ggtags-global-error-regexp-alist-alist
   (append
-   `((path "^\\(?:[^/\n]*/\\)?[^ )\t\n]+$" 0)
+   `((path "^\\(?:[^\"'\n]*/\\)?[^ )\t\n]+$" 0)
      ;; ACTIVE_ESCAPE	src/dialog.cc	172
      (ctags "^\\([^ \t\n]+\\)[ \t]+\\(.*?\\)[ \t]+\\([0-9]+\\)$"
             2 3 nil nil 2 (1 font-lock-function-name-face))
@@ -1334,7 +1339,7 @@ Invoke CALLBACK in BUFFER with process exit status when finished."
     (message "%s" (or (caar defs) "[definition not found]"))))
 
 (defun ggtags-show-definition (name)
-  (interactive (list (ggtags-read-tag)))
+  (interactive (list (ggtags-read-tag 'definition current-prefix-arg)))
   (let* ((re (cadr (assq 'grep ggtags-global-error-regexp-alist-alist)))
          (buffer (get-buffer-create " *ggtags-output*"))
          (fn ggtags-show-definition-function)
