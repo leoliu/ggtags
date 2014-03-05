@@ -105,6 +105,12 @@ automatically switches to 'global --single-update'."
                  number)
   :group 'ggtags)
 
+(defcustom ggtags-global-always-update nil
+  "If non-nil always update tags for current file on save."
+  :safe 'booleanp
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-project-duration 600
   "Seconds to keep information of a project in memory."
   :type 'number
@@ -1299,7 +1305,8 @@ Global and Emacs."
   (when (ggtags-find-project)
     (ggtags-project-update-mtime-maybe)
     ;; When oversize update on a per-save basis.
-    (when (and buffer-file-name (ggtags-project-oversize-p))
+    (when (and buffer-file-name
+               (or ggtags-global-always-update (ggtags-project-oversize-p)))
       (ggtags-with-current-project
        (process-file "global" nil 0 nil "--single-update"
                      (file-relative-name buffer-file-name))))))
