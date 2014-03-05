@@ -1311,17 +1311,16 @@ Global and Emacs."
        (process-file "global" nil 0 nil "--single-update"
                      (file-relative-name buffer-file-name))))))
 
-(defun ggtags-global-output (cmds buffer callback &optional cutoff)
-  "Asynchrously pipe the output of CMDS to BUFFER.
-Invoke CALLBACK in BUFFER with process exit status when finished."
+(defun ggtags-global-output (buffer cmds callback &optional cutoff)
+  "Asynchrously pipe the output of running CMDS to BUFFER.
+When finished invoke CALLBACK in BUFFER with process exit status."
   (or buffer (error "Output buffer required"))
-  (let* ((default-directory (or (ggtags-current-project-root) default-directory))
-         (program (car cmds))
+  (let* ((program (car cmds))
          (args (cdr cmds))
-         (cutoff (+ cutoff (if (get-buffer buffer)
-                               (with-current-buffer buffer
-                                 (line-number-at-pos (point-max)))
-                             0)))
+         (cutoff (and cutoff (+ cutoff (if (get-buffer buffer)
+                                           (with-current-buffer buffer
+                                             (line-number-at-pos (point-max)))
+                                         0))))
          (proc (apply #'start-file-process program buffer program args))
          (filter (lambda (proc string)
                    (and (buffer-live-p (process-buffer proc))
@@ -1335,7 +1334,7 @@ Invoke CALLBACK in BUFFER with process exit status when finished."
                      (when (memq (process-status proc) '(exit signal))
                        (with-current-buffer (process-buffer proc)
                          (set-process-buffer proc nil)
-                         (funcall callback (process-status proc)))))))
+                         (funcall callback (process-exit-status proc)))))))
     (set-process-query-on-exit-flag proc nil)
     (and cutoff (set-process-filter proc filter))
     (set-process-sentinel proc sentinel)
@@ -1347,8 +1346,9 @@ Invoke CALLBACK in BUFFER with process exit status when finished."
 
 (defun ggtags-show-definition (name)
   (interactive (list (ggtags-read-tag 'definition current-prefix-arg)))
+  (ggtags-check-project)
   (let* ((re (cadr (assq 'grep ggtags-global-error-regexp-alist-alist)))
-         (buffer (get-buffer-create " *ggtags-output*"))
+         (buffer (get-buffer-create " *ggtags-definition*"))
          (fn ggtags-show-definition-function)
          (show (lambda (_status)
                  (goto-char (point-min))
@@ -1360,8 +1360,9 @@ Invoke CALLBACK in BUFFER with process exit status when finished."
                                                  (string-to-number (match-string 2)))))
                  (kill-buffer buffer))))
     (ggtags-global-output
+     buffer
      (list "global" "--result=grep" "--path-style=absolute" name)
-     buffer show 100)))
+     show 100)))
 
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
