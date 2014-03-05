@@ -1342,23 +1342,27 @@ When finished invoke CALLBACK in BUFFER with process exit status."
 
 (defun ggtags-show-definition-default (defs)
   (let (message-log-max)
-    (message "%s" (or (caar defs) "[definition not found]"))))
+    (message "%s%s" (or (caar defs) "[definition not found]")
+             (if (cdr defs) " [guess]" ""))))
 
 (defun ggtags-show-definition (name)
   (interactive (list (ggtags-read-tag 'definition current-prefix-arg)))
   (ggtags-check-project)
   (let* ((re (cadr (assq 'grep ggtags-global-error-regexp-alist-alist)))
+         (current (current-buffer))
          (buffer (get-buffer-create " *ggtags-definition*"))
          (fn ggtags-show-definition-function)
          (show (lambda (_status)
                  (goto-char (point-min))
-                 (funcall fn (loop while (re-search-forward re nil t)
+                 (let ((defs (loop while (re-search-forward re nil t)
                                    collect (list (buffer-substring (1+ (match-end 2))
                                                                    (line-end-position))
                                                  name
                                                  (match-string 1)
-                                                 (string-to-number (match-string 2)))))
-                 (kill-buffer buffer))))
+                                                 (string-to-number (match-string 2))))))
+                   (kill-buffer buffer)
+                   (with-current-buffer current
+                     (funcall fn defs))))))
     (ggtags-global-output
      buffer
      (list "global" "--result=grep" "--path-style=absolute" name)
