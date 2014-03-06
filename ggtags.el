@@ -506,9 +506,10 @@ source trees. See Info node `(global)gtags' for details."
                          (directory-file-name (file-name-as-directory root))))
     (ggtags-with-current-project
      (let ((conf (and ggtags-use-project-gtagsconf
-                      (or (and (file-exists-p ".globalrc") ".globalrc")
-                          (and (file-exists-p "gtags.conf") "gtags.conf")))))
-       (cond (conf (setenv "GTAGSCONF" (expand-file-name conf)))
+                      (loop for name in '(".globalrc" "gtags.conf")
+                            for full = (expand-file-name name root)
+                            thereis (and (file-exists-p full) full)))))
+       (cond (conf (setenv "GTAGSCONF" conf))
              ((and (not (getenv "GTAGSLABEL"))
                    (yes-or-no-p "Use `ctags' backend? "))
               (setenv "GTAGSLABEL" "ctags"))))
