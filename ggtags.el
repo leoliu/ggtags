@@ -111,6 +111,13 @@ automatically switches to 'global --single-update'."
   :type 'boolean
   :group 'ggtags)
 
+(defcustom ggtags-use-project-gtagsconf t
+  "Non-nil to automatically use GTAGSCONF file at project root.
+File .globalrc and gtags.conf are checked in order."
+  :safe 'booleanp
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-project-duration 600
   "Seconds to keep information of a project in memory."
   :type 'number
@@ -498,9 +505,13 @@ source trees. See Info node `(global)gtags' for details."
     (setenv "GTAGSROOT" (expand-file-name
                          (directory-file-name (file-name-as-directory root))))
     (ggtags-with-current-project
-     (and (not (getenv "GTAGSLABEL"))
-          (yes-or-no-p "Use `ctags' backend? ")
-          (setenv "GTAGSLABEL" "ctags"))
+     (let ((conf (and ggtags-use-project-gtagsconf
+                      (or (and (file-exists-p ".globalrc") ".globalrc")
+                          (and (file-exists-p "gtags.conf") "gtags.conf")))))
+       (cond (conf (setenv "GTAGSCONF" (expand-file-name conf)))
+             ((and (not (getenv "GTAGSLABEL"))
+                   (yes-or-no-p "Use `ctags' backend? "))
+              (setenv "GTAGSLABEL" "ctags"))))
      (with-temp-message "`gtags' in progress..."
        (let ((default-directory (file-name-as-directory root)))
          (condition-case err
