@@ -535,6 +535,8 @@ non-nil."
 
 (defvar-local ggtags-completion-cache nil)
 
+;; See global/libutil/char.c
+;; (defconst ggtags-regexp-metachars "[][$()*+.?\\{}|^]")
 (defvar ggtags-completion-flag "")      ;internal use
 
 (defvar ggtags-completion-table
@@ -544,17 +546,18 @@ non-nil."
        (unless (equal cache-key (car ggtags-completion-cache))
          (setq ggtags-completion-cache
                (cons cache-key
-                     (ignore-errors
-                       ;; May throw global: only name char is allowed
-                       ;; with -c option.
-                       (ggtags-with-current-project
-                        (split-string
-                         (apply #'ggtags-process-string
-                                "global"
-                                (append (and completion-ignore-case '("--ignore-case"))
-                                        ;; Note -c alone returns only definitions
-                                        (list (concat "-c" ggtags-completion-flag) prefix)))
-                         "\n" t)))))))
+                     (condition-case-unless-debug nil
+                         ;; May throw global: only name char is
+                         ;; allowed with -c option.
+                         (ggtags-with-current-project
+                          (split-string
+                           (apply #'ggtags-process-string
+                                  "global"
+                                  (append (and completion-ignore-case '("--ignore-case"))
+                                          ;; Note -c alone returns only definitions
+                                          (list (concat "-c" ggtags-completion-flag) prefix)))
+                           "\n" t))
+                       (error nil))))))
      (cdr ggtags-completion-cache))))
 
 (defun ggtags-completion-at-point ()
@@ -1518,12 +1521,9 @@ When finished invoke CALLBACK in BUFFER with process exit status."
         ;; Overlay matches current tag so do nothing.
         nil)
        ((and bounds (let ((completion-ignore-case nil))
-                      (ignore-errors
-                        ;; May throw: global: only name char is
-                        ;; allowed with -c option
-                        (test-completion
-                         (buffer-substring (car bounds) (cdr bounds))
-                         ggtags-completion-table))))
+                      (test-completion
+                       (buffer-substring (car bounds) (cdr bounds))
+                       ggtags-completion-table)))
         (move-overlay o (car bounds) (cdr bounds) (current-buffer))
         (overlay-put o 'category 'ggtags-active-tag))
        (t (move-overlay o
