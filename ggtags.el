@@ -377,17 +377,18 @@ Value is new modtime if updated."
                                 (concat (file-remote-p default-directory)
                                         ;; Resolves symbolic links
                                         (ggtags-process-string "global" "-pr"))))
-                ;; 'global -pr' resolves symlinks before checking
-                ;; the GTAGS file which could cause issues such as
+                ;; 'global -pr' resolves symlinks before checking the
+                ;; GTAGS file which could cause issues such as
                 ;; https://github.com/leoliu/ggtags/issues/22, so
                 ;; let's help it out.
-                (when-let (gtags (locate-dominating-file
-                                  default-directory
-                                  (lambda (dir)
-                                    (file-regular-p (expand-file-name "GTAGS" dir)))))
+                ;;
+                ;; Note: `locate-dominating-file' doesn't accept
+                ;; function for NAME before 24.3.
+                (let ((gtags (locate-dominating-file default-directory "GTAGS")))
                   ;; `file-truename' may strip the trailing '/' on
                   ;; remote hosts, see http://debbugs.gnu.org/16851
-                  (file-name-as-directory (file-truename gtags)))))
+                  (and gtags (file-regular-p gtags)
+                       (file-name-as-directory (file-truename gtags))))))
       (when ggtags-project-root
         (if (gethash ggtags-project-root ggtags-projects)
             (ggtags-find-project)
