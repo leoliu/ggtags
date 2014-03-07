@@ -597,9 +597,11 @@ non-nil."
                  (user-error "No tag at point"))
                 (t (substring-no-properties default))))))
 
+(defvar ggtags-global-program "global")
+
 (defun ggtags-global-build-command (cmd &rest args)
   ;; CMD can be definition, reference, symbol, grep, idutils
-  (let ((xs (append (list "global" "-v"
+  (let ((xs (append (list ggtags-global-program "-v"
                           (format "--result=%s" ggtags-global-output-format)
                           (and ggtags-global-ignore-case "--ignore-case")
                           (and (ggtags-find-project)
