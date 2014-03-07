@@ -1473,6 +1473,23 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                   :visible (not (ggtags-find-project))))
     map))
 
+(defvar ggtags-mode-line-project-keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] 'ggtags-visit-project-root)
+    map))
+
+(put 'ggtags-mode-line-project-name 'risky-local-variable t)
+(defvar ggtags-mode-line-project-name
+  '("[" (:eval (when (stringp ggtags-project-root)
+                 (let ((name (file-name-nondirectory
+                              (directory-file-name ggtags-project-root))))
+                   (propertize name 'face compilation-info-face
+                               'help-echo (concat "mouse-1 to visit "
+                                                  ggtags-project-root)
+                               'mouse-face 'mode-line-highlight
+                               'keymap ggtags-mode-line-project-keymap))))
+    "]"))
+
 ;;;###autoload
 (define-minor-mode ggtags-mode nil
   :lighter (:eval (if ggtags-navigation-mode "" " GG"))
@@ -1485,9 +1502,16 @@ When finished invoke CALLBACK in BUFFER with process exit status."
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
         ;; Append to serve as a fallback method.
         (add-hook 'completion-at-point-functions
-                  #'ggtags-completion-at-point t t))
+                  #'ggtags-completion-at-point t t)
+        (unless (memq 'ggtags-mode-line-project-name
+                      mode-line-buffer-identification)
+          (setq mode-line-buffer-identification
+                (append mode-line-buffer-identification
+                        '(ggtags-mode-line-project-name)))))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
     (remove-hook 'completion-at-point-functions #'ggtags-completion-at-point t)
+    (setq mode-line-buffer-identification
+          (delq 'ggtags-mode-line-project-name mode-line-buffer-identification))
     (and (overlayp ggtags-highlight-tag-overlay)
          (delete-overlay ggtags-highlight-tag-overlay))
     (setq ggtags-highlight-tag-overlay nil)))
