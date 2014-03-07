@@ -7,7 +7,7 @@
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
-;; Package-Requires: ((emacs "24"))
+;; Package-Requires: ((emacs "24") (cl-lib "0.5"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -55,9 +55,9 @@
 ;;; Code:
 
 (eval-when-compile
-  (require 'cl)
   (require 'url-parse))
 
+(require 'cl-lib)
 (require 'compile)
 (require 'etags)
 (require 'tabulated-list)               ;preloaded since 24.3
@@ -71,12 +71,7 @@
     (defmacro defvar-local (var val &optional docstring)
       (declare (debug defvar) (doc-string 3))
       (list 'progn (list 'defvar var val docstring)
-            (list 'make-variable-buffer-local (list 'quote var)))))
-
-  (defmacro* when-let ((var exp) &rest body)
-    "A macro that combines `let' and `when'."
-    (declare (indent 1) (debug ((sexp form) body)))
-    `(let ((,var ,exp)) (when ,var ,@body))))
+            (list 'make-variable-buffer-local (list 'quote var))))))
 
 (eval-and-compile
   (or (fboundp 'user-error)
@@ -218,8 +213,8 @@ Users should change the value using `customize-variable' to
 properly update `ggtags-mode-map'."
   :set (lambda (sym value)
          (when (bound-and-true-p ggtags-mode-map)
-           (when-let (old (and (boundp sym) (symbol-value sym)))
-             (define-key ggtags-mode-map old nil))
+           (let ((old (and (boundp sym) (symbol-value sym))))
+             (and old (define-key ggtags-mode-map old nil)))
            (and value
                 (bound-and-true-p ggtags-mode-prefix-map)
                 (define-key ggtags-mode-map value ggtags-mode-prefix-map)))
@@ -289,21 +284,21 @@ properly update `ggtags-mode-map'."
       output)))
 
 (defun ggtags-tag-at-point ()
-  (when-let (bounds (funcall ggtags-bounds-of-tag-function))
-    (buffer-substring (car bounds) (cdr bounds))))
+  (pcase (funcall ggtags-bounds-of-tag-function)
+    (`(,beg . ,end) (buffer-substring beg end))))
 
 ;;; Store for project info and settings
 
 (defvar ggtags-projects (make-hash-table :size 7 :test #'equal))
 
-(defstruct (ggtags-project (:constructor ggtags-project--make)
-                           (:copier nil)
-                           (:type vector)
-                           :named)
+(cl-defstruct (ggtags-project (:constructor ggtags-project--make)
+                              (:copier nil)
+                              (:type vector)
+                              :named)
   root tag-size has-refs has-path-style has-color dirty-p mtime timestamp)
 
 (defun ggtags-make-project (root)
-  (check-type root string)
+  (cl-check-type root string)
   (pcase (nthcdr 5 (file-attributes (expand-file-name "GTAGS" root)))
     (`(,mtime ,_ ,tag-size . ,_)
      (let* ((default-directory (file-name-as-directory root))
@@ -357,8 +352,8 @@ Value is new modtime if updated."
   (pcase ggtags-oversize-limit
     (`nil nil)
     (`t t)
-    (size (when-let (project (or project (ggtags-find-project)))
-            (> (ggtags-project-tag-size project) size)))))
+    (size (let ((project (or project (ggtags-find-project))))
+            (and project (> (ggtags-project-tag-size project) size))))))
 
 (defvar-local ggtags-project-root 'unset
   "Internal variable for project root directory.")
@@ -427,13 +422,13 @@ Value is new modtime if updated."
                   (and (not (ggtags-project-has-refs (ggtags-find-project)))
                        (list "GTAGSLABEL=ctags"))))
          (envlist (delete-dups
-                   (loop for x in process-environment
-                         when (string-match
-                               "^\\(GTAGS[^=\n]*\\|MAKEOBJDIRPREFIX\\)=" x)
-                         ;; May have duplicates thus `delete-dups'.
-                         collect (concat (match-string 1 x)
-                                         "="
-                                         (getenv (match-string 1 x))))))
+                   (cl-loop for x in process-environment
+                            when (string-match
+                                  "^\\(GTAGS[^=\n]*\\|MAKEOBJDIRPREFIX\\)=" x)
+                            ;; May have duplicates thus `delete-dups'.
+                            collect (concat (match-string 1 x)
+                                            "="
+                                            (getenv (match-string 1 x))))))
          (help-form (format "y: save\nn: don't save\n=: diff\n?: help\n")))
     (add-dir-local-variable nil 'ggtags-process-environment envlist)
     ;; Remove trailing newlines by `add-dir-local-variable'.
@@ -491,9 +486,9 @@ Value is new modtime if updated."
          (setq ggtags-project-root ,root)))))
 
 (defun ggtags-get-libpath ()
-  (when-let (path (ggtags-with-current-project (getenv "GTAGSLIBPATH")))
-    (mapcar (apply-partially #'concat (file-remote-p default-directory))
-            (split-string path (regexp-quote path-separator) t))))
+  (let ((path (ggtags-with-current-project (getenv "GTAGSLIBPATH"))))
+    (and path (mapcar (apply-partially #'concat (file-remote-p default-directory))
+                      (split-string path (regexp-quote path-separator) t)))))
 
 (defun ggtags-create-tags (root)
   "Create tag files (e.g. GTAGS) in directory ROOT.
@@ -507,9 +502,9 @@ source trees. See Info node `(global)gtags' for details."
                          (directory-file-name (file-name-as-directory root))))
     (ggtags-with-current-project
      (let ((conf (and ggtags-use-project-gtagsconf
-                      (loop for name in '(".globalrc" "gtags.conf")
-                            for full = (expand-file-name name root)
-                            thereis (and (file-exists-p full) full)))))
+                      (cl-loop for name in '(".globalrc" "gtags.conf")
+                               for full = (expand-file-name name root)
+                               thereis (and (file-exists-p full) full)))))
        (cond (conf (setenv "GTAGSCONF" conf))
              ((and (not (getenv "GTAGSLABEL"))
                    (yes-or-no-p "Use `ctags' backend? "))
@@ -575,9 +570,9 @@ non-nil."
 
 (defun ggtags-completion-at-point ()
   "A function for `completion-at-point-functions'."
-  (when-let (bounds (funcall ggtags-bounds-of-tag-function))
-    (and (< (car bounds) (cdr bounds))
-         (list (car bounds) (cdr bounds) ggtags-completion-table))))
+  (pcase (funcall ggtags-bounds-of-tag-function)
+    (`(,beg . ,end)
+     (and (< beg end) (list beg end ggtags-completion-table)))))
 
 (defun ggtags-read-tag (&optional type confirm prompt require-match default)
   (ggtags-ensure-project)
@@ -783,11 +778,12 @@ Global and Emacs."
   (interactive (ignore (ggtags-check-project)))
   (when (ggtags-current-project-root)
     (let* ((re (concat "\\`" (regexp-opt '("GPATH" "GRTAGS" "GTAGS" "ID")) "\\'"))
-           (files (loop for file in (directory-files (ggtags-current-project-root) t re)
-                        ;; Don't trust `directory-files'.
-                        when (let ((case-fold-search nil))
-                               (string-match-p re (file-name-nondirectory file)))
-                        collect file))
+           (files (cl-remove-if-not
+                   (lambda (file)
+                     ;; Don't trust `directory-files'.
+                     (let ((case-fold-search nil))
+                       (string-match-p re (file-name-nondirectory file))))
+                   (directory-files (ggtags-current-project-root) t re)))
            (buffer "*GTags File List*"))
       (or files (user-error "No tag files found"))
       (with-output-to-temp-buffer buffer
@@ -810,7 +806,7 @@ Global and Emacs."
                    (list (read-file-name "Browse file: " nil nil t)
                          (read-number "Line: " 1))
                  (list buffer-file-name (line-number-at-pos))))
-  (check-type line integer)
+  (cl-check-type line integer)
   (or (and file (file-exists-p file)) (error "File `%s' doesn't exist" file))
   (ggtags-check-project)
   (or (file-exists-p (expand-file-name "HTML" (ggtags-current-project-root)))
@@ -892,15 +888,15 @@ Global and Emacs."
               (setq tabulated-list-format
                     `[("ID" ,(max (1+ (floor (log counter 10))) 2)
                        (lambda (x y) (< (car x) (car y))))
-                      ("Buffer" ,(max (loop for m in elements
-                                            for b = (marker-buffer m)
-                                            maximize
-                                            (length (and b (buffer-name b))))
+                      ("Buffer" ,(max (cl-loop for m in elements
+                                               for b = (marker-buffer m)
+                                               maximize
+                                               (length (and b (buffer-name b))))
                                       6)
                        t :right-align t)
-                      ("Position" ,(max (loop for m in elements
-                                              for p = (or (marker-position m) 1)
-                                              maximize (1+ (floor (log p 10))))
+                      ("Position" ,(max (cl-loop for m in elements
+                                                 for p = (or (marker-position m) 1)
+                                                 maximize (1+ (floor (log p 10))))
                                         8)
                        (lambda (x y)
                          (< (string-to-number (aref (cadr x) 2))
@@ -922,7 +918,7 @@ Global and Emacs."
                                               (funcall get-line x))
                                     (vector (number-to-string counter)
                                             "(dead)" "?" "?")))
-                          (decf counter)))
+                          (cl-decf counter)))
                       elements))))
     (setq tabulated-list-sort-key '("ID" . t))
     (tabulated-list-print)
@@ -966,8 +962,8 @@ Global and Emacs."
 
 (defun ggtags-global-column (start)
   ;; START is the beginning position of source text.
-  (when-let (mbeg (text-property-any start (line-end-position) 'global-color t))
-    (- mbeg start)))
+  (let ((mbeg (text-property-any start (line-end-position) 'global-color t)))
+    (and mbeg (- mbeg start))))
 
 ;;; NOTE: Must not match the 'Global started at Mon Jun 3 10:24:13'
 ;;; line or `compilation-auto-jump' will jump there and fail. See
@@ -1007,7 +1003,7 @@ Global and Emacs."
                             (1- (- wend wbeg)))))))
     (goto-char start)
     (while (and (> amount 0) (> end (point)))
-      (decf amount (funcall advance-word)))))
+      (cl-decf amount (funcall advance-word)))))
 
 (defun ggtags-abbreviate-files (start end)
   (goto-char start)
@@ -1049,13 +1045,13 @@ Global and Emacs."
          "^ *Using \\(?:config file '.*\\|default configuration.\\)\n"
          compilation-filter-start t)
     (replace-match ""))
-  (incf ggtags-global-output-lines
-        (count-lines compilation-filter-start (point)))
+  (cl-incf ggtags-global-output-lines
+           (count-lines compilation-filter-start (point)))
   (when (and (> ggtags-global-output-lines 5) (not ggtags-navigation-mode))
     (ggtags-global--display-buffer))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
-    (incf ggtags-global-large-output 500)
+    (cl-incf ggtags-global-large-output 500)
     (let ((message-log-max nil))
       (message "Output %d lines (Type `C-c C-k' to cancel)"
                ggtags-global-output-lines))))
@@ -1178,12 +1174,12 @@ Global and Emacs."
                                (format fmtstr (regexp-quote tag)))
                              '("\\_<%s\\_>" "%s\\_>" "%s"))))
         (beginning-of-line)
-        (if (loop for re in regexps
-                  ;; Note: tag might not agree with current
-                  ;; major-mode's symbol, so try harder. For
-                  ;; example, in `php-mode' $cacheBackend is
-                  ;; a symbol, but cacheBackend is a tag.
-                  thereis (re-search-forward re (line-end-position) t))
+        (if (cl-loop for re in regexps
+                     ;; Note: tag might not agree with current
+                     ;; major-mode's symbol, so try harder. For
+                     ;; example, in `php-mode' $cacheBackend is a
+                     ;; symbol, but cacheBackend is a tag.
+                     thereis (re-search-forward re (line-end-position) t))
             (goto-char (match-beginning 0))
           (goto-char orig))))))
 
@@ -1300,20 +1296,17 @@ Global and Emacs."
   (interactive "p")
   (ggtags-check-project)
   (let ((directories (cons (ggtags-current-project-root) (ggtags-get-libpath)))
-        (count 0)
-        (some (lambda (pred list)
-                (loop for x in list when (funcall pred x) return it))))
+        (count 0))
     (dolist (buf (buffer-list))
       (let ((file (and (buffer-live-p buf)
                        (not (eq buf (current-buffer)))
                        (buffer-file-name buf))))
-        (when (and file (funcall some
-                                 (lambda (dir)
+        (when (and file (cl-some (lambda (dir)
                                    ;; Don't use `file-in-directory-p'
                                    ;; to allow symbolic links.
                                    (string-prefix-p dir file))
                                  directories))
-          (and (kill-buffer buf) (incf count)))))
+          (and (kill-buffer buf) (cl-incf count)))))
     (and interactive
          (message "%d %s killed" count (if (= count 1) "buffer" "buffers")))))
 
@@ -1370,12 +1363,12 @@ When finished invoke CALLBACK in BUFFER with process exit status."
          (fn ggtags-show-definition-function)
          (show (lambda (_status)
                  (goto-char (point-min))
-                 (let ((defs (loop while (re-search-forward re nil t)
-                                   collect (list (buffer-substring (1+ (match-end 2))
-                                                                   (line-end-position))
-                                                 name
-                                                 (match-string 1)
-                                                 (string-to-number (match-string 2))))))
+                 (let ((defs (cl-loop while (re-search-forward re nil t)
+                                      collect (list (buffer-substring (1+ (match-end 2))
+                                                                      (line-end-position))
+                                                    name
+                                                    (match-string 1)
+                                                    (string-to-number (match-string 2))))))
                    (kill-buffer buffer)
                    (with-current-buffer current
                      (funcall fn defs))))))
@@ -1557,17 +1550,17 @@ When finished invoke CALLBACK in BUFFER with process exit status."
 ;;;###autoload
 (defun ggtags-build-imenu-index ()
   "A function suitable for `imenu-create-index-function'."
-  (when-let (file (and buffer-file-name (file-relative-name buffer-file-name)))
-    (with-temp-buffer
-      (when (with-demoted-errors
-              (zerop (ggtags-with-current-project
-                      (process-file "global" nil t nil "-x" "-f" file))))
-        (goto-char (point-min))
-        (loop while (re-search-forward
-                     "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
-              collect (list (match-string 1)
-                            (string-to-number (match-string 2))
-                            'ggtags-goto-imenu-index))))))
+  (let ((file (and buffer-file-name (file-relative-name buffer-file-name))))
+    (and file (with-temp-buffer
+                (when (with-demoted-errors
+                        (zerop (ggtags-with-current-project
+                                (process-file "global" nil t nil "-x" "-f" file))))
+                  (goto-char (point-min))
+                  (cl-loop while (re-search-forward
+                                  "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
+                           collect (list (match-string 1)
+                                         (string-to-number (match-string 2))
+                                         'ggtags-goto-imenu-index)))))))
 
 ;;; hippie-expand
 
