@@ -462,7 +462,7 @@ Value is new modtime if updated."
 
 (defun ggtags-visit-project-root ()
   (interactive)
-  (ggtags-check-project)
+  (ggtags-ensure-project)
   (dired (ggtags-current-project-root)))
 
 (defmacro ggtags-with-current-project (&rest body)
@@ -1480,14 +1480,17 @@ When finished invoke CALLBACK in BUFFER with process exit status."
 
 (put 'ggtags-mode-line-project-name 'risky-local-variable t)
 (defvar ggtags-mode-line-project-name
-  '("[" (:eval (when (stringp ggtags-project-root)
-                 (let ((name (file-name-nondirectory
-                              (directory-file-name ggtags-project-root))))
-                   (propertize name 'face compilation-info-face
-                               'help-echo (concat "mouse-1 to visit "
-                                                  ggtags-project-root)
-                               'mouse-face 'mode-line-highlight
-                               'keymap ggtags-mode-line-project-keymap))))
+  '("[" (:eval (let ((name (if (stringp ggtags-project-root)
+                               (file-name-nondirectory
+                                (directory-file-name ggtags-project-root))
+                             "?")))
+                 (propertize
+                  name 'face compilation-info-face
+                  'help-echo (if (stringp ggtags-project-root)
+                                 (concat "mouse-1 to visit " ggtags-project-root)
+                               "mouse-1 to set project")
+                  'mouse-face 'mode-line-highlight
+                  'keymap ggtags-mode-line-project-keymap)))
     "]"))
 
 ;;;###autoload
