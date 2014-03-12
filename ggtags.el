@@ -1372,10 +1372,11 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                    (kill-buffer buffer)
                    (with-current-buffer current
                      (funcall fn defs))))))
-    (ggtags-global-output
-     buffer
-     (list "global" "--result=grep" "--path-style=absolute" name)
-     show 100)))
+    (ggtags-with-current-project
+     (ggtags-global-output
+      buffer
+      (list "global" "--result=grep" "--path-style=absolute" name)
+      show 100))))
 
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
