@@ -330,12 +330,16 @@ r: references           (-r)
 s: symbols              (-s)
 ?: show this help\n"))
     (compilation-start
-	 (format "global %s --from-here=%d:%s \"%s\""
-			 (ggtags-global-options)
-			 (line-number-at-pos)
-			 (shell-quote-argument
-			  (expand-file-name (file-truename buffer-file-name)))
-			 name)
+	 (if buffer-file-name
+         (format "global %s --from-here=%d:%s \"%s\""
+                  (ggtags-global-options)
+                  (line-number-at-pos)
+                  (shell-quote-argument
+                   (expand-file-name (file-truename buffer-file-name)))
+                  name)
+       (format "global %s \"%s\""
+               (ggtags-global-options)
+               name))
      'ggtags-global-mode))
   (eval-and-compile (require 'etags))
   (ring-insert find-tag-marker-ring (point-marker))
