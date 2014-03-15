@@ -89,6 +89,12 @@
   "Face used to highlight matched line in Global buffer."
   :group 'ggtags)
 
+(defcustom ggtags-executable-directory nil
+  "If non-nil the directory to search global executables."
+  :type '(choice (const :tag "Unset" nil) directory)
+  :risky t
+  :group 'ggtags)
+
 (defcustom ggtags-oversize-limit (* 10 1024 1024)
   "The over size limit for the  GTAGS file.
 For large source trees, running 'global -u' can be expensive.
@@ -272,9 +278,15 @@ properly update `ggtags-mode-map'."
     (and (stringp (car xs))
          (ggtags-list-of-string-p (cdr xs)))))
 
+(defun ggtags-program-path (name)
+  (if ggtags-executable-directory
+      (expand-file-name name ggtags-executable-directory)
+    name))
+
 (defun ggtags-process-string (program &rest args)
   (with-temp-buffer
-    (let ((exit (apply #'process-file program nil t nil args))
+    (let ((exit (apply #'process-file
+                       (ggtags-program-path program) nil t nil args))
           (output (progn
                     (goto-char (point-max))
                     (skip-chars-backward " \t\n")
@@ -314,13 +326,16 @@ properly update `ggtags-mode-map'."
             ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
             (has-path-style
              (with-demoted-errors       ; in case `global' not found
-               (and (zerop (process-file "global" nil nil nil
+               (and (zerop (process-file (ggtags-program-path "global")
+                                         nil nil nil
                                          "--path-style" "shorter" "--help"))
                     'has-path-style)))
             ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
             (has-color
              (with-demoted-errors
-               (and (zerop (process-file "global" nil nil nil "--color" "--help"))
+               (and (zerop (process-file (ggtags-program-path "global")
+                                         nil nil nil
+                                         "--color" "--help"))
                     'has-color))))
        (puthash default-directory
                 (ggtags-project--make :root default-directory
@@ -608,7 +623,8 @@ non-nil."
 
 (defun ggtags-global-build-command (cmd &rest args)
   ;; CMD can be definition, reference, symbol, grep, idutils
-  (let ((xs (append (list "global" "-v"
+  (let ((xs (append (list (shell-quote-argument (ggtags-program-path "global"))
+                          "-v"
                           (format "--result=%s" ggtags-global-output-format)
                           (and ggtags-global-ignore-case "--ignore-case")
                           (and (ggtags-find-project)
@@ -1326,7 +1342,7 @@ Global and Emacs."
     (when (and buffer-file-name
                (or ggtags-global-always-update (ggtags-project-oversize-p)))
       (ggtags-with-current-project
-       (process-file "global" nil 0 nil "--single-update"
+       (process-file (ggtags-program-path "global") nil 0 nil "--single-update"
                      (file-relative-name buffer-file-name))))))
 
 (defun ggtags-global-output (buffer cmds callback &optional cutoff)
@@ -1384,7 +1400,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (ggtags-with-current-project
      (ggtags-global-output
       buffer
-      (list "global" "--result=grep" "--path-style=absolute" name)
+      (list (ggtags-program-path "global")
+            "--result=grep" "--path-style=absolute" name)
       show 100))))
 
 (defvar ggtags-mode-prefix-map
@@ -1591,7 +1608,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (and file (with-temp-buffer
                 (when (with-demoted-errors
                         (zerop (ggtags-with-current-project
-                                (process-file "global" nil t nil "-x" "-f" file))))
+                                (process-file (ggtags-program-path "global")
+                                              nil t nil "-x" "-f" file))))
                   (goto-char (point-min))
                   (cl-loop while (re-search-forward
                                   "^\\([^ \t]+\\)[ \t]+\\([0-9]+\\)" nil t)
