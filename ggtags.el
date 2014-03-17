@@ -108,6 +108,16 @@ automatically switches to 'global --single-update'."
                  number)
   :group 'ggtags)
 
+(defcustom ggtags-include-pattern
+  '("^\\s-*#\\(?:include\\|import\\)\\s-*[\"<]\\(.*?\\)[\">]" . 1)
+  "Pattern used to detect #include files.
+Value can be (REGEXP . SUB) or a function with no arguments."
+  :type '(choice (const :tag "Disable" nil)
+                 (cons regexp integer)
+                 function)
+  :safe 'stringp
+  :group 'ggtags)
+
 (defcustom ggtags-global-always-update nil
   "If non-nil always update tags for current file on save."
   :safe 'booleanp
@@ -693,31 +703,46 @@ non-nil."
   (ggtags-global-start (apply #'ggtags-global-build-command cmd args)))
 
 ;;;###autoload
-(defun ggtags-find-tag-dwim (name &optional definition)
+(defun ggtags-find-tag-dwim (name &optional what)
   "Find definitions or references of tag NAME by context.
 If point is at a definition tag, find references, and vice versa.
-With a prefix arg (non-nil DEFINITION) always find definitions."
-  (interactive (list (ggtags-read-tag 'definition current-prefix-arg)
-                     current-prefix-arg))
+With a prefix arg always find definitions. If point is at a line
+that matches `ggtags-include-pattern', find the include file
+instead."
+  (interactive
+   (let ((include (and (not current-prefix-arg)
+                       ggtags-include-pattern
+                       (save-excursion
+                         (beginning-of-line)
+                         (if (functionp ggtags-include-pattern)
+                             (funcall ggtags-include-pattern)
+                           (and (looking-at (car ggtags-include-pattern))
+                                (match-string (cdr ggtags-include-pattern))))))))
+     (if include (list include 'include)
+       (list (ggtags-read-tag 'definition current-prefix-arg)
+             (and current-prefix-arg 'definition)))))
   (ggtags-check-project)     ; for `ggtags-current-project-root' below
-  (if (or definition
-          (not buffer-file-name)
-          (and (ggtags-find-project)
-               (not (ggtags-project-has-refs (ggtags-find-project)))))
-      (ggtags-find-tag 'definition name)
-    (ggtags-find-tag
-     (format "--from-here=%d:%s"
-             (line-number-at-pos)
-             (shell-quote-argument
-              ;; Note `ggtags-global-start' binds default-directory to
-              ;; project root.
-              (file-relative-name
-               buffer-file-name
-               (if (string-prefix-p (ggtags-current-project-root)
-                                    buffer-file-name)
-                   (ggtags-current-project-root)
-                 (locate-dominating-file buffer-file-name "GTAGS")))))
-     name)))
+  (cond
+   ((eq what 'include)
+    (ggtags-find-file name))
+   ((or (eq what 'definition)
+        (not buffer-file-name)
+        (and (ggtags-find-project)
+             (not (ggtags-project-has-refs (ggtags-find-project)))))
+    (ggtags-find-tag 'definition name))
+   (t (ggtags-find-tag
+       (format "--from-here=%d:%s"
+               (line-number-at-pos)
+               (shell-quote-argument
+                ;; Note `ggtags-global-start' binds default-directory to
+                ;; project root.
+                (file-relative-name
+                 buffer-file-name
+                 (if (string-prefix-p (ggtags-current-project-root)
+                                      buffer-file-name)
+                     (ggtags-current-project-root)
+                   (locate-dominating-file buffer-file-name "GTAGS")))))
+       name))))
 
 (defun ggtags-find-reference (name)
   (interactive (list (ggtags-read-tag 'reference current-prefix-arg)))
