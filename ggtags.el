@@ -75,7 +75,9 @@
 
 (eval-and-compile
   (or (fboundp 'user-error)
-      (defalias 'user-error 'error)))
+      (defalias 'user-error 'error))
+  (or (fboundp 'read-only-mode)
+      (defalias 'read-only-mode 'toggle-read-only)))
 
 (defgroup ggtags nil
   "GNU Global source code tagging system."
@@ -473,7 +475,7 @@ Value is new modtime if updated."
     (save-buffer)
     (kill-buffer)
     (when buffer-file-name
-      (setq buffer-read-only val))
+      (read-only-mode (if val +1 -1)))
     (when (called-interactively-p 'interactive)
       (message "Project read-only-mode is %s" (if val "on" "off")))
     val))
