@@ -1213,6 +1213,9 @@ Use \\[jump-to-register] to restore the search session."
     (define-key map "\M-{" 'ggtags-navigation-previous-file)
     (define-key map "\M->" 'ggtags-navigation-last-error)
     (define-key map "\M-<" 'ggtags-navigation-first-error)
+    ;; Note: shadows `isearch-forward-regexp' but it can be invoked
+    ;; with C-u C-s instead.
+    (define-key map "\C-\M-s" 'ggtags-navigation-isearch-forward)
     (define-key map "\C-c\C-k"
       (lambda () (interactive)
         (ggtags-ensure-global-buffer (kill-compilation))))
@@ -1329,6 +1332,17 @@ Use \\[jump-to-register] to restore the search session."
     (goto-char (point-max))
     (compilation-previous-error 1)
     (compile-goto-error)))
+
+(defun ggtags-navigation-isearch-forward (&optional regexp-p)
+  (interactive "P")
+  (ggtags-ensure-global-buffer
+   (let ((saved (if visible-mode 1 -1)))
+     (visible-mode 1)
+     (with-selected-window (get-buffer-window (current-buffer))
+       (isearch-forward regexp-p)
+       (beginning-of-line)
+       (visible-mode saved)
+       (compile-goto-error)))))
 
 (defun ggtags-navigation-visible-mode (&optional arg)
   (interactive (list (or current-prefix-arg 'toggle)))
