@@ -1133,7 +1133,7 @@ Use \\[jump-to-register] to restore the search session."
     (replace-match ""))
   (cl-incf ggtags-global-output-lines
            (count-lines compilation-filter-start (point)))
-  (when (and (> ggtags-global-output-lines 5) (not ggtags-navigation-mode))
+  (when (and (> ggtags-global-output-lines 5) ggtags-navigation-mode)
     (ggtags-global--display-buffer))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
@@ -1142,8 +1142,8 @@ Use \\[jump-to-register] to restore the search session."
       (message "Output %d lines (Type `C-c C-k' to cancel)"
                ggtags-global-output-lines))))
 
-(defun ggtags-handle-single-match (buf _how)
-  (if (not (zerop ggtags-global-exit-status))
+(defun ggtags-handle-single-match (buf how)
+  (if (string-prefix-p "exited abnormally" how)
       ;; If exit abnormally display the buffer for inspection.
       (ggtags-global--display-buffer)
     (when (and ggtags-auto-jump-to-first-match
