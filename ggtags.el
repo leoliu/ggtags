@@ -58,6 +58,7 @@
   (require 'url-parse))
 
 (require 'cl-lib)
+(require 'ewoc)
 (require 'compile)
 (require 'etags)
 (require 'tabulated-list)               ;preloaded since 24.3
@@ -837,36 +838,92 @@ Global and Emacs."
             (nreverse files))))
     (tags-query-replace from to delimited file-form)))
 
+(defvar ggtags-global-search-history nil)
+
+(defun ggtags-global-search-id (cmd directory)
+  (sha1 (concat directory (make-string 1 0) cmd)))
+
+(defun ggtags-global-restore-search-1 (data)
+  (pcase data
+    (`(,cmd ,dir ,line ,_text)
+     (with-current-buffer
+         (let ((ggtags-auto-jump-to-first-match nil)
+               ;; Switch current project to ROOT.
+               (default-directory dir)
+               (ggtags-project-root dir))
+           (ggtags-global-start cmd dir))
+       (add-hook 'compilation-finish-functions
+                 (lambda (buf _msg)
+                   (with-current-buffer buf
+                     (ggtags-forward-to-line line)
+                     (with-demoted-errors (compile-goto-error))))
+                 nil t)))))
+
+(defvar-local ggtags-global-search-ewoc nil)
+
+(defvar ggtags-global-restore-search-map
+  (cl-labels ((next (arg)
+                    (interactive "p")
+                    (ewoc-goto-next ggtags-global-search-ewoc arg))
+              (prev (arg)
+                    (interactive "p")
+                    (ewoc-goto-prev ggtags-global-search-ewoc arg))
+              (done ()
+                    (interactive)
+                    (let ((node (ewoc-locate ggtags-global-search-ewoc)))
+                      (when node
+                        (quit-windows-on (ewoc-buffer ggtags-global-search-ewoc))
+                        (ggtags-global-restore-search-1 (cdr (ewoc-data node)))))))
+    (let ((m (make-sparse-keymap)))
+      (set-keymap-parent m special-mode-map)
+      (define-key m "p"    #'prev)
+      (define-key m "\M-p" #'prev)
+      (define-key m "n"    #'next)
+      (define-key m "\M-n" #'next)
+      (define-key m "\r"   #'done)
+      m)))
+
+(defun ggtags-global-restore-search ()
+  (interactive)
+  (or ggtags-global-search-history (user-error "No search history"))
+  (let ((split-window-preferred-function ggtags-split-window-function)
+        (inhibit-read-only t))
+    (pop-to-buffer "*Ggtags Search History*")
+    (erase-buffer)
+    (special-mode)
+    (use-local-map ggtags-global-restore-search-map)
+    (setq truncate-lines t)
+    (cl-labels ((prop (s) (propertize s 'face 'minibuffer-prompt))
+                (pp (data)
+                    (pcase data
+                      (`(,_id ,cmd ,dir ,line ,text)
+                       (insert (prop " cmd: ") cmd "\n"
+                               (prop " dir: ") dir "\n"
+                               (prop "line: ") (number-to-string line) "\n"
+                               (prop "text: ") text "\n"
+                               (propertize (make-string 32 ?-) 'face 'shadow))))))
+      (setq ggtags-global-search-ewoc
+            (ewoc-create #'pp "Global search history keys: n:next  p:prev  RET:choose\n")))
+    (dolist (data ggtags-global-search-history)
+      (ewoc-enter-last ggtags-global-search-ewoc data))
+    (fit-window-to-buffer)))
+
 (defun ggtags-save-to-register (r)
   "Save current search session to register R.
 Use \\[jump-to-register] to restore the search session."
   (interactive (list (ggtags-ensure-global-buffer
                        (register-read-with-preview "Save search to register: "))))
   (ggtags-ensure-global-buffer
-    (cl-labels ((jump (data)
-                      (pcase data
-                        (`(,command ,root ,line)
-                         (with-current-buffer
-                             (let ((ggtags-auto-jump-to-first-match nil)
-                                   ;; Switch current project to ROOT.
-                                   (default-directory root)
-                                   (ggtags-project-root root))
-                               (ggtags-global-start command root))
-                           (add-hook 'compilation-finish-functions
-                                     (lambda (buf _msg)
-                                       (with-current-buffer buf
-                                         (ggtags-forward-to-line line)
-                                         (compile-goto-error)))
-                                     nil t)))))
-                (prn (data)
+    (cl-labels ((prn (data)
                      (pcase data
-                       (`(,command ,root ,line)
+                       (`(,command ,root ,line ,_)
                         (princ (format "a ggtags search session `%s' in directory `%s' at line %d."
                                        command root line))))))
       (set-register r (registerv-make
                        (list (car compilation-arguments) default-directory
-                             (line-number-at-pos))
-                       :jump-func #'jump :print-func #'prn)))))
+                             (line-number-at-pos) "")
+                       :jump-func #'ggtags-global-restore-search-1
+                       :print-func #'prn)))))
 
 (defun ggtags-delete-tag-files ()
   "Delete the tag files generated by gtags."
@@ -1366,7 +1423,19 @@ Use \\[jump-to-register] to restore the search session."
         (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
       (move-overlay ggtags-global-line-overlay
                     (line-beginning-position) (line-end-position)
-                    (current-buffer))))
+                    (current-buffer))
+      ;; Update search history
+      (let* ((history-delete-duplicates t)
+             (search-id (ggtags-global-search-id (car compilation-arguments)
+                                                 default-directory))
+             (session (cdr (assoc search-id ggtags-global-search-history)))
+             (line (line-number-at-pos))
+             (text (buffer-substring (line-beginning-position) (line-end-position))))
+        (if session
+            (setf (cddr session) (list line text))
+          (add-to-history 'ggtags-global-search-history
+                          (list search-id (car compilation-arguments)
+                                default-directory line text))))))
   (run-hooks 'ggtags-find-tag-hook))
 
 (define-minor-mode ggtags-navigation-mode nil
@@ -1502,6 +1571,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (define-key m "\M-k" 'ggtags-kill-file-buffers)
     (define-key m "\M-h" 'ggtags-view-tag-history)
     (define-key m "\M-j" 'ggtags-visit-project-root)
+    (define-key m "\M-/" 'ggtags-global-restore-search)
     (define-key m (kbd "M-SPC") 'ggtags-save-to-register)
     (define-key m (kbd "M-%") 'ggtags-query-replace)
     (define-key m "\M-?" 'ggtags-show-definition)
@@ -1553,6 +1623,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (define-key menu [prev-mark]
       '(menu-item "Previous mark" ggtags-prev-mark))
     (define-key menu [sep1] menu-bar-separator)
+    (define-key menu [restore-search]
+      '(menu-item "Restore search from history" ggtags-global-restore-search))
     (define-key menu [save-to-register]
       '(menu-item "Save search session" ggtags-save-to-register))
     (define-key menu [previous-error]
