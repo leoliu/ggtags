@@ -71,7 +71,12 @@
     (defmacro defvar-local (var val &optional docstring)
       (declare (debug defvar) (doc-string 3))
       (list 'progn (list 'defvar var val docstring)
-            (list 'make-variable-buffer-local (list 'quote var))))))
+            (list 'make-variable-buffer-local (list 'quote var)))))
+
+  (defmacro ignore-errors-unless-debug (&rest body)
+    "Ignore all errors while executing BODY unless debug is on."
+    (declare (debug t) (indent 0))
+    `(condition-case-unless-debug nil (progn ,@body) (error nil))))
 
 (eval-and-compile
   (or (fboundp 'user-error)             ;24.3
@@ -400,10 +405,11 @@ Value is new modtime if updated."
               (ggtags-find-project))
           project)
       (setq ggtags-project-root
-            (or (ignore-errors (file-name-as-directory
-                                (concat (file-remote-p default-directory)
-                                        ;; Resolves symbolic links
-                                        (ggtags-process-string "global" "-pr"))))
+            (or (ignore-errors-unless-debug
+                  (file-name-as-directory
+                   (concat (file-remote-p default-directory)
+                           ;; Resolves symbolic links
+                           (ggtags-process-string "global" "-pr"))))
                 ;; 'global -pr' resolves symlinks before checking the
                 ;; GTAGS file which could cause issues such as
                 ;; https://github.com/leoliu/ggtags/issues/22, so
@@ -592,18 +598,17 @@ non-nil."
        (unless (equal cache-key (car ggtags-completion-cache))
          (setq ggtags-completion-cache
                (cons cache-key
-                     (condition-case-unless-debug nil
-                         ;; May throw global: only name char is
-                         ;; allowed with -c option.
-                         (ggtags-with-current-project
-                          (split-string
-                           (apply #'ggtags-process-string
-                                  "global"
-                                  (append (and completion-ignore-case '("--ignore-case"))
-                                          ;; Note -c alone returns only definitions
-                                          (list (concat "-c" ggtags-completion-flag) prefix)))
-                           "\n" t))
-                       (error nil))))))
+                     (ignore-errors-unless-debug
+                       ;; May throw global: only name char is allowed
+                       ;; with -c option.
+                       (ggtags-with-current-project
+                        (split-string
+                         (apply #'ggtags-process-string
+                                "global"
+                                (append (and completion-ignore-case '("--ignore-case"))
+                                        ;; Note -c alone returns only definitions
+                                        (list (concat "-c" ggtags-completion-flag) prefix)))
+                         "\n" t)))))))
      (cdr ggtags-completion-cache))))
 
 (defun ggtags-completion-at-point ()
