@@ -292,10 +292,15 @@ properly update `ggtags-mode-map'."
 
 (defun ggtags-list-of-string-p (xs)
   "Return non-nil if XS is a list of strings."
-  (if (null xs)
-      t
-    (and (stringp (car xs))
-         (ggtags-list-of-string-p (cdr xs)))))
+  (cl-every #'stringp xs))
+
+(defun ggtags-forward-to-line (line)
+  "Move to line number LINE in current buffer."
+  (cl-check-type line (integer 1))
+  (save-restriction
+    (widen)
+    (goto-char (point-min))
+    (forward-line (1- line))))
 
 (defun ggtags-program-path (name)
   (if ggtags-executable-directory
@@ -850,8 +855,7 @@ Use \\[jump-to-register] to restore the search session."
                            (add-hook 'compilation-finish-functions
                                      (lambda (buf _msg)
                                        (with-current-buffer buf
-                                         (goto-char (point-min))
-                                         (forward-line (1- line))
+                                         (ggtags-forward-to-line line)
                                          (compile-goto-error)))
                                      nil t)))))
                 (prn (data)
@@ -1678,11 +1682,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
 ;;; imenu
 
 (defun ggtags-goto-imenu-index (name line &rest _args)
-  (save-restriction
-    (widen)
-    (goto-char (point-min))
-    (forward-line (1- line))
-    (ggtags-move-to-tag name)))
+  (ggtags-forward-to-line line)
+  (ggtags-move-to-tag name))
 
 ;;;###autoload
 (defun ggtags-build-imenu-index ()
