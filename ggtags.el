@@ -111,7 +111,7 @@ automatically switches to 'global --single-update'."
   :group 'ggtags)
 
 (defcustom ggtags-include-pattern
-  '("^\\s-*#\\(?:include\\|import\\)\\s-*[\"<]\\(.*?\\)[\">]" . 1)
+  '("^\\s-*#\\(?:include\\|import\\)\\s-*[\"<]\\(?:[./]*\\)?\\(.*?\\)[\">]" . 1)
   "Pattern used to detect #include files.
 Value can be (REGEXP . SUB) or a function with no arguments."
   :type '(choice (const :tag "Disable" nil)
@@ -411,11 +411,11 @@ Value is new modtime if updated."
                 ;;
                 ;; Note: `locate-dominating-file' doesn't accept
                 ;; function for NAME before 24.3.
-                (let ((gtags (locate-dominating-file default-directory "GTAGS")))
+                (let ((dir (locate-dominating-file default-directory "GTAGS")))
                   ;; `file-truename' may strip the trailing '/' on
                   ;; remote hosts, see http://debbugs.gnu.org/16851
-                  (and gtags (file-regular-p gtags)
-                       (file-name-as-directory (file-truename gtags))))))
+                  (and dir (file-regular-p (expand-file-name "GTAGS" dir))
+                       (file-name-as-directory (file-truename dir))))))
       (when ggtags-project-root
         (if (gethash ggtags-project-root ggtags-projects)
             (ggtags-find-project)
