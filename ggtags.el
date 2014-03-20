@@ -836,7 +836,7 @@ Global and Emacs."
   "Save current search session to register R.
 Use \\[jump-to-register] to restore the search session."
   (interactive (list (ggtags-ensure-global-buffer
-                      (register-read-with-preview "Save search to register: "))))
+                       (register-read-with-preview "Save search to register: "))))
   (ggtags-ensure-global-buffer
     (cl-labels ((jump (data)
                       (pcase data
@@ -1333,13 +1333,13 @@ Use \\[jump-to-register] to restore the search session."
 (defun ggtags-navigation-isearch-forward (&optional regexp-p)
   (interactive "P")
   (ggtags-ensure-global-buffer
-   (let ((saved (if visible-mode 1 -1)))
-     (visible-mode 1)
-     (with-selected-window (get-buffer-window (current-buffer))
-       (isearch-forward regexp-p)
-       (beginning-of-line)
-       (visible-mode saved)
-       (compile-goto-error)))))
+    (let ((saved (if visible-mode 1 -1)))
+      (visible-mode 1)
+      (with-selected-window (get-buffer-window (current-buffer))
+        (isearch-forward regexp-p)
+        (beginning-of-line)
+        (visible-mode saved)
+        (compile-goto-error)))))
 
 (defun ggtags-navigation-visible-mode (&optional arg)
   (interactive (list (or current-prefix-arg 'toggle)))
@@ -1357,12 +1357,12 @@ Use \\[jump-to-register] to restore the search session."
   (and ggtags-mode-sticky (ggtags-mode 1))
   (ignore-errors
     (ggtags-ensure-global-buffer
-     (unless (overlayp ggtags-global-line-overlay)
-       (setq ggtags-global-line-overlay (make-overlay (point) (point)))
-       (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
-     (move-overlay ggtags-global-line-overlay
-                   (line-beginning-position) (line-end-position)
-                   (current-buffer))))
+      (unless (overlayp ggtags-global-line-overlay)
+        (setq ggtags-global-line-overlay (make-overlay (point) (point)))
+        (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
+      (move-overlay ggtags-global-line-overlay
+                    (line-beginning-position) (line-end-position)
+                    (current-buffer))))
   (run-hooks 'ggtags-find-tag-hook))
 
 (define-minor-mode ggtags-navigation-mode nil
@@ -1370,13 +1370,13 @@ Use \\[jump-to-register] to restore the search session."
   (" GG[" (:eval
            (ignore-errors
              (ggtags-ensure-global-buffer
-              (let ((index (when (get-text-property (line-beginning-position)
-                                                    'compilation-message)
-                             ;; Assume the first match appears at line 5
-                             (- (line-number-at-pos) 4))))
-                `((:propertize ,(if index
-                                    (number-to-string (max index 0))
-                                  "?") face success) "/")))))
+               (let ((index (when (get-text-property (line-beginning-position)
+                                                     'compilation-message)
+                              ;; Assume the first match appears at line 5
+                              (- (line-number-at-pos) 4))))
+                 `((:propertize ,(if index
+                                     (number-to-string (max index 0))
+                                   "?") face success) "/")))))
    (:propertize (:eval (number-to-string ggtags-global-match-count))
                 face success)
    (:eval
