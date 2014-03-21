@@ -896,6 +896,7 @@ Global and Emacs."
              (interactive)
              (let ((node (ewoc-locate ggtags-global-search-ewoc)))
                (when node
+                 (save)
                  (quit)
                  (ggtags-global-rerun-search-1 (cdr (ewoc-data node)))))))
     (let ((m (make-sparse-keymap)))
@@ -909,6 +910,8 @@ Global and Emacs."
       (define-key m "\r"   #'done)
       m)))
 
+(defvar ggtags-navigation-mode)
+
 (defun ggtags-global-rerun-search ()
   "Pop up a buffer to choose a past search to re-run.
 
@@ -921,6 +924,7 @@ Global and Emacs."
     (erase-buffer)
     (special-mode)
     (use-local-map ggtags-global-rerun-search-map)
+    (setq-local ggtags-navigation-mode nil)
     (setq truncate-lines t)
     (cl-labels ((prop (s) (propertize s 'face 'minibuffer-prompt))
                 (pp (data)
@@ -1214,8 +1218,6 @@ Use \\[jump-to-register] to restore the search session."
              (w (display-buffer buffer '(nil (allow-no-window . t)))))
         (and w (compilation-set-window-height w))))))
 
-(defvar ggtags-navigation-mode)
-
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
   (let ((ansi-color-apply-face-function
@@ -1379,7 +1381,7 @@ Use \\[jump-to-register] to restore the search session."
              (kill-compilation))
            (when (and (derived-mode-p 'ggtags-global-mode)
                       (get-buffer-window))
-             (quit-window nil (get-buffer-window)))
+             (quit-windows-on (current-buffer)))
            (and time (run-with-idle-timer time nil #'kill-buffer buf))))))
 
 (defun ggtags-navigation-mode-done ()
