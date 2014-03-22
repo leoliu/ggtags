@@ -216,6 +216,11 @@ If an integer abbreviate only names longer than that number."
   :type 'integer
   :group 'ggtags)
 
+(defcustom ggtags-suppress-navigation-keys nil
+  "If non-nil key bindings in `ggtags-navigation-map' are suppressed."
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-find-tag-hook nil
   "Hook run immediately after finding a tag."
   :options '(recenter reposition-window)
@@ -1341,10 +1346,6 @@ Use \\[jump-to-register] to restore the search session."
 (defvar ggtags-mode-map-alist
   `((ggtags-navigation-mode . ,ggtags-navigation-map)))
 
-;; Higher priority for `ggtags-navigation-mode' to avoid being
-;; hijacked by modes such as `view-mode'.
-(add-to-list 'emulation-mode-map-alists 'ggtags-mode-map-alist)
-
 (defvar ggtags-navigation-mode-map
   (let ((map (make-sparse-keymap))
         (menu (make-sparse-keymap "GG-Navigation")))
@@ -1368,6 +1369,8 @@ Use \\[jump-to-register] to restore the search session."
       '(menu-item "Previous file" ggtags-navigation-previous-file))
     (define-key menu [next-file]
       '(menu-item "Next file" ggtags-navigation-next-file))
+    (define-key menu [isearch-forward]
+      '(menu-item "Find match with isearch" ggtags-navigation-isearch-forward))
     (define-key menu [previous]
       '(menu-item "Previous match" previous-error))
     (define-key menu [next]
@@ -1465,29 +1468,30 @@ Use \\[jump-to-register] to restore the search session."
 (defvar ggtags-global-line-overlay nil)
 
 (defun ggtags-global-next-error-function ()
-  (ggtags-move-to-tag)
-  (ggtags-global-save-start-marker)
-  (and (ggtags-project-update-mtime-maybe)
-       (message "File `%s' is newer than GTAGS"
-                (file-name-nondirectory buffer-file-name)))
-  (and ggtags-mode-sticky (ggtags-mode 1))
-  (ignore-errors
-    (ggtags-ensure-global-buffer
-      (unless (overlayp ggtags-global-line-overlay)
-        (setq ggtags-global-line-overlay (make-overlay (point) (point)))
-        (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
-      (move-overlay ggtags-global-line-overlay
-                    (line-beginning-position) (line-end-position)
-                    (current-buffer))
-      ;; Update search history
-      (let ((id (ggtags-global-search-id (car compilation-arguments)
-                                         default-directory)))
-        (setq ggtags-global-search-history
-              (cl-remove id ggtags-global-search-history :test #'equal :key #'car))
-        (add-to-history 'ggtags-global-search-history
-                        (cons id (ggtags-global-current-search))
-                        ggtags-global-history-length))))
-  (run-hooks 'ggtags-find-tag-hook))
+  (when (eq next-error-last-buffer ggtags-global-last-buffer)
+    (ggtags-move-to-tag)
+    (ggtags-global-save-start-marker)
+    (and (ggtags-project-update-mtime-maybe)
+         (message "File `%s' is newer than GTAGS"
+                  (file-name-nondirectory buffer-file-name)))
+    (and ggtags-mode-sticky (ggtags-mode 1))
+    (ignore-errors
+      (ggtags-ensure-global-buffer
+        (unless (overlayp ggtags-global-line-overlay)
+          (setq ggtags-global-line-overlay (make-overlay (point) (point)))
+          (overlay-put ggtags-global-line-overlay 'face 'ggtags-global-line))
+        (move-overlay ggtags-global-line-overlay
+                      (line-beginning-position) (line-end-position)
+                      (current-buffer))
+        ;; Update search history
+        (let ((id (ggtags-global-search-id (car compilation-arguments)
+                                           default-directory)))
+          (setq ggtags-global-search-history
+                (cl-remove id ggtags-global-search-history :test #'equal :key #'car))
+          (add-to-history 'ggtags-global-search-history
+                          (cons id (ggtags-global-current-search))
+                          ggtags-global-history-length))))
+    (run-hooks 'ggtags-find-tag-hook)))
 
 (define-minor-mode ggtags-navigation-mode nil
   :lighter
@@ -1511,8 +1515,14 @@ Use \\[jump-to-register] to restore the search session."
   :global t
   (if ggtags-navigation-mode
       (progn
+        ;; Higher priority for `ggtags-navigation-mode' to avoid being
+        ;; hijacked by modes such as `view-mode'.
+        (unless ggtags-suppress-navigation-keys
+          (add-to-list 'emulation-mode-map-alists 'ggtags-mode-map-alist))
         (add-hook 'next-error-hook 'ggtags-global-next-error-function)
         (add-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function))
+    (setq emulation-mode-map-alists
+          (delq 'ggtags-mode-map-alist emulation-mode-map-alists))
     (remove-hook 'next-error-hook 'ggtags-global-next-error-function)
     (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function)))
 
@@ -1610,7 +1620,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
 
 (defvar ggtags-mode-prefix-map
   (let ((m (make-sparse-keymap)))
-    (define-key m "\M-'" 'previous-error)
+    ;; Globally bound to `M-g p'.
+    ;; (define-key m "\M-'" 'previous-error)
     (define-key m (kbd "M-DEL") 'ggtags-delete-tag-files)
     (define-key m "\M-p" 'ggtags-prev-mark)
     (define-key m "\M-n" 'ggtags-next-mark)
@@ -1853,11 +1864,6 @@ When finished invoke CALLBACK in BUFFER with process exit status."
   (interactive "P")
   (unload-feature 'ggtags force)
   (require 'ggtags))
-
-(defun ggtags-unload-function ()
-  (setq emulation-mode-map-alists
-        (delq 'ggtags-mode-map-alist emulation-mode-map-alists))
-  nil)
 
 (provide 'ggtags)
 ;;; ggtags.el ends here
