@@ -1,33 +1,46 @@
 =========================================================
  Emacs frontend to GNU Global source code tagging system
 =========================================================
- 
+
 This package is part of `GNU ELPA <http://elpa.gnu.org>`_ (``M-x
 list-packages``) and is also available on `MELPA
 <http://melpa.milkbox.net/#/ggtags>`_.
 
-``ggtags.el`` is tested in emacs 24.1, 24.2, 24.3 and trunk. Patches,
-feature requests and bug reports are welcome. Thanks.
+The goal is to make working with GNU Global in Emacs as effortlessly
+and intuitively as possible and to integrate tightly with standard
+emacs packages. ``ggtags.el`` is tested in emacs 24.1, 24.2, 24.3 and
+trunk. Patches, feature requests and bug reports are welcome. Thanks.
 
 Features
 ~~~~~~~~
 
-#. Automatically update Global's tag files when needed with tuning for
-   large source trees.
-#. Read tag with completion.
 #. Build on ``compile.el`` for asynchronicity and its large
    feature-set.
+#. Automatically update Global's tag files when needed with tuning for
+   large source trees.
 #. Intuitive navigation among multiple matches with mode-line display
    of current match, total matches and exit status.
-#. Manage Global's environment variables on a per-project basis.
-#. Support all Global search backends: ``grep``, ``idutils`` etc.
+#. Read tag with completion.
+#. Show definition at point.
+#. Jump to #include files.
+#. Support search history and saving a search to register/bookmark.
 #. Query replace.
+#. Manage Global's environment variables on a per-project basis.
 #. Highlight (definition) tag at point.
 #. Abbreviated display of file names.
+#. Support all Global search backends: ``grep``, ``idutils`` etc.
 #. Support `exuberant ctags <http://ctags.sourceforge.net/>`_ backend.
 #. Support all Global's output formats: ``grep``, ``ctags-x``,
    ``cscope`` etc.
 #. Support projects on remote hosts (e.g. via ``tramp``)
+
+Screenshot
+~~~~~~~~~~
+
+.. figure:: http://i.imgur.com/LX7PVc3.png
+   :width: 500px
+   :target: http://i.imgur.com/LX7PVc3.png
+   :alt: ggtags.png
 
 Why GNU Global
 ~~~~~~~~~~~~~~
@@ -36,68 +49,197 @@ The opengrok project composed a feature comparison `table
 <https://github.com/OpenGrok/OpenGrok/wiki/Comparison-with-Similar-Tools>`_
 between a few tools.
 
-Screenshot
-~~~~~~~~~~
+Install Global and plugins
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. figure:: http://i.imgur.com/r9nz3ss.png
-   :width: 500px
-   :target: http://i.imgur.com/r9nz3ss.png
-   :alt: ggtags.png
+1. Compile and install Global with ``exuberant-ctags``
+::
+
+   ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
+   make && make install
+
+The executable ``ctags`` is unfortunately named because ``emacs`` also
+includes a command of the same name. So make sure it is from
+http://ctags.sourceforge.net. See ``plugin-factory/README`` in GNU
+Global source for further information.
+
+2. Install ``pygments`` plugin
+::
+
+   pip install pygments
+   git clone https://github.com/yoshizow/global-pygments-plugin.git
+   sh reconf.sh
+   ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
+   make && make install
+   cp sample.globalrc $HOME/.globalrc
+
+Make sure the value of ``<PREFIX>`` agree with step 1.
 
 Config
 ~~~~~~
 
-Enable ``ggtags-mode`` for C/C++/Java modes::
+Global with ``exuberant-ctags`` and ``pygments`` plugins can support
+dozens of programming languages. For example, to enable
+``ggtags-mode`` for C/C++/Java modes::
 
     (add-hook 'c-mode-common-hook
               (lambda ()
                 (when (derived-mode-p 'c-mode 'c++-mode 'java-mode)
                   (ggtags-mode 1))))
 
-More languages/modes are supported if `GNU Global
-<http://www.gnu.org/software/global>`_ is compiled with
-``--with-exuberant-ctags`` to support `exuberant ctags
-<http://ctags.sourceforge.net/>`_. Also set the environment variable
-``GTAGSCONF`` to the correct location of ``gtags.conf``. For example::
-
-  export GTAGSCONF=/usr/local/share/gtags/gtags.conf
-
-See ``plugin-factory/README`` in GNU Global source for further
-information.
-
 Also see https://github.com/leoliu/ggtags/wiki for more examples.
 
-Tutorial
-~~~~~~~~
+Usage
+~~~~~
 
-Type ``M-x ggtags-mode`` to enable the minor mode, or as usual enable
-it in your desired major mode hooks. When the mode is on the symbol at
-point is underlined if it is a valid (definition) tag.
+Open any file in a project and type ``M-x ggtags-mode``. Use ``M-.``
+(``ggtags-find-tag-dwim``) to find the tag at point. If the project
+has not been indexed (i.e. no ``GTAGS`` file exists), ``ggtags`` will
+ask for the project root directory and index it recursively.
+Alternatively one can invoke ``ggtags-create-tags`` to index a
+directory. The mode line will display the directory name next to the
+buffer name. If point is at a valid definition tag, it is underlined.
 
-``M-.`` finds definitions or references according to the tag at point,
-i.e. if point is at a definition tag find references and vice versa.
-``M-]`` finds references.
+``ggtags`` is similar to the standard ``etags`` package. For example
+these keys ``M-.``, ``M-,``, ``M-*`` and ``C-M-.`` should work as
+expected in ``ggtags-mode``.
 
-If multiple matches are found, navigation mode is entered, the
-mode-line lighter changed, and a navigation menu-bar entry presented.
-In this mode, ``M-n`` and ``M-p`` moves to next and previous match,
-``M-}`` and ``M-{`` to next and previous file respectively. ``M-o``
-toggles between full and abbreviated displays of file names in the
-auxiliary popup window. When you locate the right match, press RET to
-finish which hides the auxiliary window and exits navigation mode. You
-can continue the search using ``M-,``. To abort the search press
-``M-*``.
+The following search commands are available:
 
-Normally after a few searches a dozen buffers are created visiting
-files tracked by GNU Global. ``C-c M-k`` helps clean them up.
+ggtags-find-tag-dwim
 
-Check the menu-bar entry ``Ggtags`` for other useful commands.
+   Find a tag by context.
 
-Development
-~~~~~~~~~~~
+   If point is at a definition tag, find references, and vice versa.
+   If point is at a line that matches ``ggtags-include-pattern``, find
+   the include file instead.
 
-The goal is to make working with GNU Global in Emacs as effortlessly
-and intuitively as possible.
+   To force finding a definition tag, call it with a prefix (``C-u``).
+
+ggtags-find-reference
+
+   Find references to a tag. With ``C-u`` ask for the tag name with
+   completion.
+
+ggtags-find-other-symbol
+
+   Find a tag that has no definition. With ``C-u`` ask for the tag
+   name with completion.
+
+ggtags-find-tag-regexp
+
+   Find definition tags matching a regexp. By default it lists all
+   matching tags in the project. With ``C-u`` restrict the lists to a
+   directory of choice.
+
+ggtags-idutils-query
+
+   Use idutils to find matches.
+
+ggtags-grep
+
+   Grep for lines matching a regexp. This is usually the slowest.
+
+ggtags-find-file
+
+   Find a file from all the files indexed by ``gtags``.
+
+ggtags-query-replace
+
+   Do a query replace in all files found in a search.
+
+Handling multiple matches
++++++++++++++++++++++++++
+
+When a search finds multiple matches, a buffer named
+``*ggtags-global*`` is popped up and ``ggtags-navigation-mode`` is
+turned on to facilitate locating the right match.
+``ggtags-navigation-mode`` makes a few commands in the
+``*ggtags-global*`` buffer globally accessible:
+
+``M-n``
+
+   Move to the next match.
+
+``M-p``
+
+   Move to the previous match.
+
+``M-}``
+
+   Move to next file.
+
+``M-{``
+
+   Move to previous file.
+
+``M-<``
+
+   Move to the first match.
+
+``M->``
+
+   Move to the last match.
+
+``C-M-s``
+
+   Use ``isearch`` to find the match.
+
+``RET``
+
+   Found the right match so exit the navigation mode. Resumable by
+   ``M-,`` (``tags-loop-continue``).
+
+``M-*``
+
+   Abort and go back to the location where the search was started.
+
+Miscellaneous commands
+++++++++++++++++++++++
+
+Commands are made avaiable via the ``Ggtags`` menu in ``ggtags-mode``.
+
+ggtags-prev-mark
+
+   Move to the previously (older) visited location. Unlike ``M-*``
+   this doesn't delete the location from the tag ring.
+
+ggtags-next-mark
+
+   Move to the next (newer) visited location.
+
+ggtags-view-tag-history
+
+   Pop to a buffer listing all visited locations from newest to
+   oldest. Use ``TAB`` and ``S-TAB`` to move to next/prev entry and
+   ``RET`` to visit it.
+
+ggtags-global-rerun-search
+
+   Re-run a search from search history as kept in
+   ``ggtags-global-search-history``.
+
+ggtags-kill-file-buffers
+
+   Kill all file-visiting buffers of current project.
+
+ggtags-toggle-project-read-only
+
+   Toggle opening files in ``read-only`` mode. Handy if the main
+   purpose of source navigation is to read code.
+
+ggtags-visit-project-root
+
+   Open the project root directory in ``dired``.
+
+ggtags-delete-tag-files
+
+   Delete the GTAGS, GRTAGS, GPATH and ID files of current project.
+
+ggtags-browse-file-as-hypertext
+
+   Use ``htags`` to generate HTML of the source tree. This allows
+   browsing the porject in a browser with cross-references.
 
 Bugs
 ~~~~
