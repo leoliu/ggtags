@@ -1831,7 +1831,7 @@ to nil disables displaying this information.")
 ;;; hippie-expand
 
 ;;;###autoload
-(defun try-complete-ggtags-tag (old)
+(defun ggtags-try-complete-tag (old)
   "A function suitable for `hippie-expand-try-functions-list'."
   (with-no-warnings                     ; to avoid loading hippie-exp
     (unless old

@@ -241,6 +241,23 @@ ggtags-browse-file-as-hypertext
    Use ``htags`` to generate HTML of the source tree. This allows
    browsing the porject in a browser with cross-references.
 
+Integration with other packages
++++++++++++++++++++++++++++++++
+
+* imenu
+
+  Emacs major modes usually have excellent support for ``imenu`` so
+  this is not enabled by default. To use:
+  ::
+
+    (setq-local imenu-create-index-function #'ggtags-build-imenu-index)
+
+* hippie-exp
+  ::
+
+     (setq-local hippie-expand-try-functions-list
+                 (cons 'ggtags-try-complete-tag hippie-expand-try-functions-list))
+
 Bugs
 ~~~~
 
