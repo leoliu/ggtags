@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.0
+;; Version: 0.8.1
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -1058,7 +1058,22 @@ Use \\[jump-to-register] to restore the search session."
   (interactive)
   (ggtags-next-mark 'previous))
 
+(defvar ggtags-view-tag-history-mode-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m "\M-n" 'next-error-no-select)
+    (define-key m "\M-p" 'previous-error-no-select)
+    (define-key m "q" (lambda () (interactive) (quit-window t)))
+    m))
+
+(define-derived-mode ggtags-view-tag-history-mode tabulated-list-mode "TagHist"
+  :abbrev-table nil :group 'ggtags)
+
 (defun ggtags-view-tag-history ()
+  "Pop to a buffer listing visited locations from newest to oldest.
+The buffer is a next error buffer and works with standard
+commands `next-error' and `previous-error'.
+
+\\{ggtags-view-tag-history-mode-map}"
   (interactive)
   (and (ring-empty-p find-tag-marker-ring)
        (user-error "Tag ring empty"))
@@ -1066,31 +1081,25 @@ Use \\[jump-to-register] to restore the search session."
         (inhibit-read-only t))
     (pop-to-buffer "*Tag Ring*")
     (erase-buffer)
-    (tabulated-list-mode)
+    (ggtags-view-tag-history-mode)
+    (setq next-error-function #'ggtags-view-tag-history-next-error
+          next-error-last-buffer (current-buffer))
     (setq tabulated-list-entries
           ;; Use a function so that revert can work properly.
           (lambda ()
             (let ((counter (ring-length find-tag-marker-ring))
                   (elements (or (ring-elements find-tag-marker-ring)
                                 (user-error "Tag ring empty")))
-                  (action
-                   (lambda (button) (interactive)
-                     (let ((m (button-get button 'marker)))
-                       (or (markerp m) (user-error "Marker dead"))
-                       (setq ggtags-tag-ring-index
-                             (ring-member find-tag-marker-ring m))
-                       (pop-to-buffer (marker-buffer m))
-                       (goto-char (marker-position m)))))
-                  (get-line
-                   (lambda (m)
-                     (with-current-buffer (marker-buffer m)
-                       (save-excursion
-                         (goto-char m)
-                         (buffer-substring (line-beginning-position)
-                                           (line-end-position)))))))
+                  (action (lambda (_button) (next-error 0)))
+                  (get-line (lambda (m)
+                              (with-current-buffer (marker-buffer m)
+                                (save-excursion
+                                  (goto-char m)
+                                  (buffer-substring (line-beginning-position)
+                                                    (line-end-position)))))))
               (setq tabulated-list-format
                     `[("ID" ,(max (1+ (floor (log counter 10))) 2)
-                       (lambda (x y) (< (car x) (car y))))
+                       car-less-than-car)
                       ("Buffer" ,(max (cl-loop for m in elements
                                                for b = (marker-buffer m)
                                                maximize
@@ -1125,7 +1134,22 @@ Use \\[jump-to-register] to restore the search session."
                       elements))))
     (setq tabulated-list-sort-key '("ID" . t))
     (tabulated-list-print)
-    (fit-window-to-buffer)))
+    (fit-window-to-buffer nil (floor (frame-height) 2))))
+
+(defun ggtags-view-tag-history-next-error (&optional arg reset)
+  (if (not reset)
+      (forward-button arg)
+    (goto-char (point-min))
+    (forward-button (if (button-at (point)) 0 1)))
+  (when (get-buffer-window)
+    (set-window-point (get-buffer-window) (point)))
+  (pcase (button-get (button-at (point)) 'marker)
+    ((and (pred markerp) m)
+     (if (eq (get-buffer-window) (selected-window))
+         (pop-to-buffer (marker-buffer m))
+       (switch-to-buffer (marker-buffer m)))
+     (goto-char (marker-position m)))
+    (_ (error "Dead marker"))))
 
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   (setq ggtags-global-exit-status exit-status)

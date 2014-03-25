@@ -187,8 +187,8 @@ turned on to facilitate locating the right match.
 
 ``RET``
 
-   Found the right match so exit the navigation mode. Resumable by
-   ``M-,`` (``tags-loop-continue``).
+   Found the right match so exit navigation mode. Resumable by ``M-,``
+   (``tags-loop-continue``).
 
 ``M-*``
 
@@ -197,7 +197,7 @@ turned on to facilitate locating the right match.
 Miscellaneous commands
 ++++++++++++++++++++++
 
-Commands are made avaiable via the ``Ggtags`` menu in ``ggtags-mode``.
+Commands are avaiable from the ``Ggtags`` menu in ``ggtags-mode``.
 
 ggtags-prev-mark
 
@@ -211,8 +211,11 @@ ggtags-next-mark
 ggtags-view-tag-history
 
    Pop to a buffer listing all visited locations from newest to
-   oldest. Use ``TAB`` and ``S-TAB`` to move to next/prev entry and
-   ``RET`` to visit it.
+   oldest. The buffer is a next error buffer and works with standard
+   commands ``next-error`` and ``previous-error``. In addition ``TAB``
+   and ``S-TAB`` move to next/prev entry, and ``RET`` visits the
+   location. ``M-n`` and ``M-p`` move to and display the next/previous
+   entry.
 
 ggtags-global-rerun-search
 
