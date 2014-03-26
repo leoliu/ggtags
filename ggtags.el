@@ -1192,7 +1192,7 @@ commands `next-error' and `previous-error'.
 (defvar ggtags-global-error-regexp-alist-alist
   (append
    `((path "^\\(?:[^\"'\n]*/\\)?[^ )\t\n]+$" 0)
-     ;; ACTIVE_ESCAPE	src/dialog.cc	172
+     ;; ACTIVE_ESCAPE   src/dialog.cc   172
      (ctags "^\\([^ \t\n]+\\)[ \t]+\\(.*?\\)[ \t]+\\([0-9]+\\)$"
             2 3 nil nil 2 (1 font-lock-function-name-face))
      ;; ACTIVE_ESCAPE     172 src/dialog.cc    #undef ACTIVE_ESCAPE
@@ -1850,25 +1850,23 @@ to nil disables displaying this information.")
 ;;;###autoload
 (defun ggtags-try-complete-tag (old)
   "A function suitable for `hippie-expand-try-functions-list'."
-  (with-no-warnings                     ; to avoid loading hippie-exp
-    (unless old
-      (he-init-string (if (looking-back "\\_<.*" (line-beginning-position))
-                          (match-beginning 0)
-                        (point))
-                      (point))
-      (setq he-expand-list
-            (and (not (equal he-search-string ""))
-                 (ggtags-find-project)
-                 (sort (all-completions he-search-string
-                                        ggtags-completion-table)
-                       #'string-lessp))))
-    (if (null he-expand-list)
-        (progn
-          (if old (he-reset-string))
-          nil)
-      (he-substitute-string (car he-expand-list))
-      (setq he-expand-list (cdr he-expand-list))
-      t)))
+  (eval-and-compile (require 'hippie-exp))
+  (unless old
+    (he-init-string (or (car (funcall ggtags-bounds-of-tag-function)) (point))
+                    (point))
+    (setq he-expand-list
+          (and (not (equal he-search-string ""))
+               (ggtags-find-project)
+               (sort (all-completions he-search-string
+                                      ggtags-completion-table)
+                     #'string-lessp))))
+  (if (null he-expand-list)
+      (progn
+        (if old (he-reset-string))
+        nil)
+    (he-substitute-string (car he-expand-list))
+    (setq he-expand-list (cdr he-expand-list))
+    t))
 
 (defun ggtags-reload (&optional force)
   (interactive "P")
