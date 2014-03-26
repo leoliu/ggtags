@@ -634,9 +634,8 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
                  (completing-read
                   (format (if default "%s (default %s): " "%s: ") prompt default)
                   ggtags-completion-table nil require-match nil nil default))
-                ((not default)
-                 (user-error "No tag at point"))
-                (t (substring-no-properties default))))))
+                (default (substring-no-properties default))
+                (t (ggtags-read-tag type t prompt require-match default))))))
 
 (defun ggtags-global-build-command (cmd &rest args)
   ;; CMD can be definition, reference, symbol, grep, idutils
@@ -738,7 +737,7 @@ definition tags."
         (not buffer-file-name)
         (and (ggtags-find-project)
              (not (ggtags-project-has-refs (ggtags-find-project)))))
-    (ggtags-find-tag 'definition name))
+    (ggtags-find-tag 'definition (shell-quote-argument name)))
    (t (ggtags-find-tag
        (format "--from-here=%d:%s"
                (line-number-at-pos)
@@ -751,16 +750,16 @@ definition tags."
                                       buffer-file-name)
                      (ggtags-current-project-root)
                    (locate-dominating-file buffer-file-name "GTAGS")))))
-       name))))
+       (shell-quote-argument name)))))
 
 (defun ggtags-find-reference (name)
   (interactive (list (ggtags-read-tag 'reference current-prefix-arg)))
-  (ggtags-find-tag 'reference name))
+  (ggtags-find-tag 'reference (shell-quote-argument name)))
 
 (defun ggtags-find-other-symbol (name)
   "Find tag NAME that is a reference without a definition."
   (interactive (list (ggtags-read-tag 'symbol current-prefix-arg)))
-  (ggtags-find-tag 'symbol name))
+  (ggtags-find-tag 'symbol (shell-quote-argument name)))
 
 (defun ggtags-quote-pattern (pattern)
   (prin1-to-string (substring-no-properties pattern)))
