@@ -244,11 +244,6 @@ properly update `ggtags-mode-map'."
   :type 'key-sequence
   :group 'ggtags)
 
-(defcustom ggtags-completing-read-function completing-read-function
-  "Ggtags specific `completing-read-function' (which see)."
-  :type 'function
-  :group 'ggtags)
-
 (defcustom ggtags-highlight-tag-delay 0.25
   "Time in seconds before highlighting tag at point."
   :set (lambda (sym value)
@@ -624,7 +619,6 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
 (defun ggtags-read-tag (&optional type confirm prompt require-match default)
   (ggtags-ensure-project)
   (let ((default (or default (ggtags-tag-at-point)))
-        (completing-read-function ggtags-completing-read-function)
         (prompt (or prompt (capitalize (symbol-name (or type 'tag)))))
         (ggtags-completion-flag (pcase type
                                   (`(or nil definition) "T")
@@ -1375,10 +1369,10 @@ commands `next-error' and `previous-error'.
       '(menu-item "Finish navigation" ggtags-navigation-mode-done))
     (define-key menu [abort]
       '(menu-item "Abort" ggtags-navigation-mode-abort))
-    (define-key menu [last-error]
-      '(menu-item "Last error" ggtags-navigation-last-error))
-    (define-key menu [fist-error]
-      '(menu-item "Fist error" ggtags-navigation-first-error))
+    (define-key menu [last-match]
+      '(menu-item "Last match" ggtags-navigation-last-error))
+    (define-key menu [first-match]
+      '(menu-item "First match" ggtags-navigation-first-error))
     (define-key menu [previous-file]
       '(menu-item "Previous file" ggtags-navigation-previous-file))
     (define-key menu [next-file]
