@@ -392,8 +392,19 @@ Value is new modtime if updated."
 (defvar-local ggtags-project-root 'unset
   "Internal variable for project root directory.")
 
+(defun ggtags-clear-project-root ()
+  (kill-local-variable 'ggtags-project-root))
+
 ;;;###autoload
 (defun ggtags-find-project ()
+  ;; See https://github.com/leoliu/ggtags/issues/42
+  ;;
+  ;; It is unsafe to cache `ggtags-project-root' in non-file buffers.
+  ;; But we keep the cache for at this a command's duration so that
+  ;; multiple calls of `ggtags-find-project' has no performance
+  ;; impact.
+  (unless buffer-file-name
+    (add-hook 'pre-command-hook #'ggtags-clear-project-root nil t))
   (let ((project (gethash ggtags-project-root ggtags-projects)))
     (if (ggtags-project-p project)
         (if (ggtags-project-expired-p project)
