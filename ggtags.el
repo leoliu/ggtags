@@ -1292,13 +1292,20 @@ commands `next-error' and `previous-error'.
            (count-lines compilation-filter-start (point)))
   (when (and (> ggtags-global-output-lines 5) ggtags-navigation-mode)
     (ggtags-global--display-buffer))
-  (when (and (numberp ggtags-auto-jump-to-match-target)
+  (when (and (eq ggtags-auto-jump-to-match 'history)
+             (numberp ggtags-auto-jump-to-match-target)
              ;; `ggtags-global-output-lines' is imprecise.
              (> (line-number-at-pos (point-max))
                 ggtags-auto-jump-to-match-target))
     (ggtags-forward-to-line ggtags-auto-jump-to-match-target)
     (setq-local ggtags-auto-jump-to-match-target nil)
-    (with-demoted-errors (compile-goto-error)))
+    ;;
+    ;; Can't call `compile-goto-error' here becuase
+    ;; `compilation-filter' restores point and as a result commands
+    ;; dependent on point such as `ggtags-navigation-next-file' and
+    ;; `ggtags-navigation-previous-file' fail to work.
+    (setq-local compilation-auto-jump-to-first-error t)
+    (run-with-idle-timer 0 nil #'compilation-auto-jump (current-buffer) (point)))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
     (cl-incf ggtags-global-large-output 500)
