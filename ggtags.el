@@ -709,11 +709,11 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
                    (fboundp 'display-buffer-no-window))
               (list #'display-buffer-no-window)
             display-buffer-overriding-action))
-         (env ggtags-process-environment)
-         (ggtags-auto-jump-to-match-target
-          (nth 4 (assoc (ggtags-global-search-id command default-directory)
-                        ggtags-global-search-history))))
+         (env ggtags-process-environment))
     (setq ggtags-global-start-marker (point-marker))
+    (setq ggtags-auto-jump-to-match-target
+          (nth 4 (assoc (ggtags-global-search-id command default-directory)
+                        ggtags-global-search-history)))
     (ggtags-navigation-mode +1)
     (setq ggtags-global-exit-status 0
           ggtags-global-match-count 0)
@@ -1298,7 +1298,6 @@ commands `next-error' and `previous-error'.
                 ggtags-auto-jump-to-match-target))
     (ggtags-forward-to-line ggtags-auto-jump-to-match-target)
     (setq-local ggtags-auto-jump-to-match-target nil)
-    (compilation--ensure-parse (line-beginning-position 2))
     (with-demoted-errors (compile-goto-error)))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
@@ -1362,6 +1361,7 @@ commands `next-error' and `previous-error'.
   (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
   (add-hook 'compilation-finish-functions 'ggtags-handle-single-match nil t)
   (setq-local bookmark-make-record-function #'ggtags-make-bookmark-record)
+  (setq-local ggtags-navigation-mode nil)
   (add-hook 'kill-buffer-hook (lambda () (ggtags-navigation-mode -1)) nil t))
 
 ;; NOTE: Need this to avoid putting menu items in
