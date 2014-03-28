@@ -141,9 +141,15 @@ directory local variables is not enabled by default per
   :type '(repeat string)
   :group 'ggtags)
 
-(defcustom ggtags-auto-jump-to-first-match t
-  "Non-nil to automatically jump to the first match."
-  :type 'boolean
+(defcustom ggtags-auto-jump-to-match 'first
+  "Strategy on how to jump to match: nil, first or history.
+
+  nil:   never automatically jump to any match;
+first:   jump to the first match;
+history: jump to the match stored in search history."
+  :type '(choice (const :tag "First match" first)
+                 (const :tag "Search History" history)
+                 (const :tag "Never" nil))
   :group 'ggtags)
 
 (defcustom ggtags-global-window-height 8 ; ggtags-global-mode
@@ -680,11 +686,12 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
 
 ;; takes three values: nil, t and a marker
 (defvar ggtags-global-start-marker nil)
-
 (defvar ggtags-global-exit-status 0)
 (defvar ggtags-global-match-count 0)
-
 (defvar ggtags-tag-ring-index nil)
+(defvar ggtags-global-search-history nil)
+
+(defvar ggtags-auto-jump-to-match-target nil)
 
 (defun ggtags-global-save-start-marker ()
   (when (markerp ggtags-global-start-marker)
@@ -697,12 +704,15 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
          (split-window-preferred-function ggtags-split-window-function)
          ;; See http://debbugs.gnu.org/13594
          (display-buffer-overriding-action
-          (if (and ggtags-auto-jump-to-first-match
+          (if (and ggtags-auto-jump-to-match
                    ;; Appeared in emacs 24.4.
                    (fboundp 'display-buffer-no-window))
               (list #'display-buffer-no-window)
             display-buffer-overriding-action))
-         (env ggtags-process-environment))
+         (env ggtags-process-environment)
+         (ggtags-auto-jump-to-match-target
+          (nth 4 (assoc (ggtags-global-search-id command default-directory)
+                        ggtags-global-search-history))))
     (setq ggtags-global-start-marker (point-marker))
     (ggtags-navigation-mode +1)
     (setq ggtags-global-exit-status 0
@@ -834,7 +844,7 @@ Global and Emacs."
    (let ((args (query-replace-read-args "Query replace (regexp)" t t)))
      (list (nth 0 args) (nth 1 args) (nth 2 args))))
   (unless ggtags-navigation-mode
-    (let ((ggtags-auto-jump-to-first-match nil))
+    (let ((ggtags-auto-jump-to-match nil))
       (ggtags-grep from)))
   (let ((file-form
          '(let ((files))
@@ -853,8 +863,6 @@ Global and Emacs."
             (nreverse files))))
     (tags-query-replace from to delimited file-form)))
 
-(defvar ggtags-global-search-history nil)
-
 (defun ggtags-global-search-id (cmd directory)
   (sha1 (concat directory (make-string 1 0) cmd)))
 
@@ -871,7 +879,7 @@ Global and Emacs."
 (defun ggtags-global-rerun-search-1 (data)
   (pcase data
     (`(,cmd ,dir ,env ,line ,_text)
-     (with-current-buffer (let ((ggtags-auto-jump-to-first-match nil)
+     (with-current-buffer (let ((ggtags-auto-jump-to-match nil)
                                 ;; Switch current project to DIR.
                                 (default-directory dir)
                                 (ggtags-project-root dir)
@@ -1284,6 +1292,14 @@ commands `next-error' and `previous-error'.
            (count-lines compilation-filter-start (point)))
   (when (and (> ggtags-global-output-lines 5) ggtags-navigation-mode)
     (ggtags-global--display-buffer))
+  (when (and (numberp ggtags-auto-jump-to-match-target)
+             ;; `ggtags-global-output-lines' is imprecise.
+             (> (line-number-at-pos (point-max))
+                ggtags-auto-jump-to-match-target))
+    (ggtags-forward-to-line ggtags-auto-jump-to-match-target)
+    (setq-local ggtags-auto-jump-to-match-target nil)
+    (compilation--ensure-parse (line-beginning-position 2))
+    (with-demoted-errors (compile-goto-error)))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
     (cl-incf ggtags-global-large-output 500)
@@ -1295,7 +1311,7 @@ commands `next-error' and `previous-error'.
   (if (string-prefix-p "exited abnormally" how)
       ;; If exit abnormally display the buffer for inspection.
       (ggtags-global--display-buffer)
-    (when (and ggtags-auto-jump-to-first-match
+    (when (and ggtags-auto-jump-to-match
                (save-excursion
                  (goto-char (point-min))
                  (not (ignore-errors
@@ -1324,8 +1340,12 @@ commands `next-error' and `previous-error'.
   (make-local-variable 'ggtags-global-output-format)
   (setq-local compilation-error-regexp-alist
               (list ggtags-global-output-format))
-  (setq-local compilation-auto-jump-to-first-error
-              ggtags-auto-jump-to-first-match)
+  (pcase ggtags-auto-jump-to-match
+    (`history (make-local-variable 'ggtags-auto-jump-to-match-target)
+              (setq-local compilation-auto-jump-to-first-error
+                          (not ggtags-auto-jump-to-match-target)))
+    (`nil (setq-local compilation-auto-jump-to-first-error nil))
+    (_ (setq-local compilation-auto-jump-to-first-error t)))
   (setq-local compilation-scroll-output nil)
   ;; See `compilation-move-to-column' for details.
   (setq-local compilation-first-column 0)
