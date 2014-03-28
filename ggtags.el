@@ -179,6 +179,12 @@ If an integer abbreviate only names longer than that number."
                  (const cscope))
   :group 'ggtags)
 
+(defcustom ggtags-global-use-color t
+  "Non-nil to use color in output if supported by Global."
+  :type 'boolean
+  :safe 'booleanp
+  :group 'ggtags)
+
 (defcustom ggtags-global-ignore-case nil
   "Non-nil if Global should ignore case in the search pattern."
   :safe 'booleanp
@@ -259,6 +265,10 @@ properly update `ggtags-mode-map'."
   :type 'function
   :group 'ggtags)
 
+;; Used by ggtags-global-mode
+(defvar ggtags-global-error "match"
+  "Stem of message to print when no matches are found.")
+
 (defconst ggtags-bug-url "https://github.com/leoliu/ggtags/issues")
 
 (defvar ggtags-global-last-buffer nil)
@@ -268,10 +278,6 @@ properly update `ggtags-mode-map'."
 (defvar ggtags-highlight-tag-overlay nil)
 
 (defvar ggtags-highlight-tag-timer nil)
-
-;; Used by ggtags-global-mode
-(defvar ggtags-global-error "match"
-  "Stem of message to print when no matches are found.")
 
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
@@ -400,9 +406,8 @@ Value is new modtime if updated."
   ;; See https://github.com/leoliu/ggtags/issues/42
   ;;
   ;; It is unsafe to cache `ggtags-project-root' in non-file buffers.
-  ;; But we keep the cache for at this a command's duration so that
-  ;; multiple calls of `ggtags-find-project' has no performance
-  ;; impact.
+  ;; But we keep the cache for a command's duration so that multiple
+  ;; calls of `ggtags-find-project' has no performance impact.
   (unless buffer-file-name
     (add-hook 'pre-command-hook #'ggtags-clear-project-root nil t))
   (let ((project (gethash ggtags-project-root ggtags-projects)))
@@ -654,7 +659,8 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
                           "-v"
                           (format "--result=%s" ggtags-global-output-format)
                           (and ggtags-global-ignore-case "--ignore-case")
-                          (and (ggtags-find-project)
+                          (and ggtags-global-use-color
+                               (ggtags-find-project)
                                (ggtags-project-has-color (ggtags-find-project))
                                "--color=always")
                           (and (ggtags-find-project)
@@ -1013,7 +1019,7 @@ Use \\[jump-to-register] to restore the search session."
                    (list (read-file-name "Browse file: " nil nil t)
                          (read-number "Line: " 1))
                  (list buffer-file-name (line-number-at-pos))))
-  (cl-check-type line integer)
+  (cl-check-type line (integer 1))
   (or (and file (file-exists-p file)) (error "File `%s' doesn't exist" file))
   (ggtags-check-project)
   (or (file-exists-p (expand-file-name "HTML" (ggtags-current-project-root)))
