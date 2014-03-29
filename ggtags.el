@@ -34,8 +34,7 @@
 ;; `ggtags-mode'. See the README in https://github.com/leoliu/ggtags
 ;; for more details.
 ;;
-;; All commands are made available in the menu-bar entry `Ggtags' in
-;; `ggtags-mode'.
+;; All commands are available from the `Ggtags' menu in `ggtags-mode'.
 
 ;;; Code:
 
@@ -1314,24 +1313,24 @@ commands `next-error' and `previous-error'.
       (message "Output %d lines (Type `C-c C-k' to cancel)"
                ggtags-global-output-lines))))
 
-(defun ggtags-handle-single-match (buf how)
-  (if (string-prefix-p "exited abnormally" how)
-      ;; If exit abnormally display the buffer for inspection.
-      (ggtags-global--display-buffer)
-    (when (and ggtags-auto-jump-to-match
-               (save-excursion
-                 (goto-char (point-min))
-                 (not (ignore-errors
-                        (goto-char (compilation-next-single-property-change
-                                    (point) 'compilation-message))
-                        (end-of-line)
-                        (compilation-next-single-property-change
-                         (point) 'compilation-message)))))
-      ;; For the `compilation-auto-jump' in idle timer to run. See also:
-      ;; http://debbugs.gnu.org/13829
-      (sit-for 0)
-      (ggtags-navigation-mode -1)
-      (ggtags-navigation-mode-cleanup buf 0))))
+(defun ggtags-global-handle-exit (buf how)
+  "A function for `compilation-finish-functions' (which see)."
+  (cond
+   ((string-prefix-p "exited abnormally" how)
+    ;; If exit abnormally display the buffer for inspection.
+    (ggtags-global--display-buffer))
+   ((and ggtags-auto-jump-to-match
+         (not (pcase (compilation-next-single-property-change
+                      (point-min) 'compilation-message)
+                ((and pt (guard pt))
+                 (compilation-next-single-property-change
+                  (save-excursion (goto-char pt) (end-of-line) (point))
+                  'compilation-message)))))
+    ;; For the `compilation-auto-jump' in idle timer to run.
+    ;; See also: http://debbugs.gnu.org/13829
+    (sit-for 0)
+    (ggtags-navigation-mode -1)
+    (ggtags-navigation-mode-cleanup buf 0))))
 
 (defvar ggtags-global-mode-font-lock-keywords
   '(("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
@@ -1367,7 +1366,7 @@ commands `next-error' and `previous-error'.
   (setq-local truncate-lines t)
   (jit-lock-register #'ggtags-abbreviate-files)
   (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
-  (add-hook 'compilation-finish-functions 'ggtags-handle-single-match nil t)
+  (add-hook 'compilation-finish-functions 'ggtags-global-handle-exit nil t)
   (setq-local bookmark-make-record-function #'ggtags-make-bookmark-record)
   (add-hook 'kill-buffer-hook (lambda () (ggtags-navigation-mode -1)) nil t))
 
