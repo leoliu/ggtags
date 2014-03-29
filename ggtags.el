@@ -143,8 +143,8 @@ directory local variables is not enabled by default per
 (defcustom ggtags-auto-jump-to-match 'first
   "Strategy on how to jump to match: nil, first or history.
 
-  nil:   never automatically jump to any match;
-first:   jump to the first match;
+    nil: never automatically jump to any match;
+  first: jump to the first match;
 history: jump to the match stored in search history."
   :type '(choice (const :tag "First match" first)
                  (const :tag "Search History" history)
@@ -1467,13 +1467,13 @@ commands `next-error' and `previous-error'.
 (defun ggtags-navigation-mode-abort ()
   (interactive)
   (ggtags-navigation-mode -1)
+  (ggtags-navigation-mode-cleanup nil 0)
   ;; Run after (ggtags-navigation-mode -1) or
   ;; ggtags-global-start-marker might not have been saved.
   (when (and ggtags-global-start-marker
              (not (markerp ggtags-global-start-marker)))
     (setq ggtags-global-start-marker nil)
-    (pop-tag-mark))
-  (ggtags-navigation-mode-cleanup nil 0))
+    (pop-tag-mark)))
 
 (defun ggtags-navigation-next-file (n)
   (interactive "p")
