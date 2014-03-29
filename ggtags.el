@@ -1291,7 +1291,8 @@ commands `next-error' and `previous-error'.
   (cl-incf ggtags-global-output-lines
            (count-lines compilation-filter-start (point)))
   (when (and (> ggtags-global-output-lines 5) ggtags-navigation-mode)
-    (ggtags-global--display-buffer))
+    (ggtags-global--display-buffer)
+    (setq-local ggtags-navigation-mode nil))
   (when (and (eq ggtags-auto-jump-to-match 'history)
              (numberp ggtags-auto-jump-to-match-target)
              ;; `ggtags-global-output-lines' is imprecise.
@@ -1368,7 +1369,6 @@ commands `next-error' and `previous-error'.
   (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
   (add-hook 'compilation-finish-functions 'ggtags-handle-single-match nil t)
   (setq-local bookmark-make-record-function #'ggtags-make-bookmark-record)
-  (setq-local ggtags-navigation-mode nil)
   (add-hook 'kill-buffer-hook (lambda () (ggtags-navigation-mode -1)) nil t))
 
 ;; NOTE: Need this to avoid putting menu items in
