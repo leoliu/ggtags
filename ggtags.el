@@ -213,8 +213,9 @@ This affects `ggtags-find-file' and `ggtags-grep'."
   :type 'integer
   :group 'ggtags)
 
-(defcustom ggtags-suppress-navigation-keys nil
-  "If non-nil key bindings in `ggtags-navigation-map' are suppressed."
+(defcustom ggtags-enable-navigation-keys t
+  "If non-nil key bindings in `ggtags-navigation-map' are enabled."
+  :safe 'booleanp
   :type 'boolean
   :group 'ggtags)
 
@@ -942,7 +943,7 @@ Global and Emacs."
     (erase-buffer)
     (special-mode)
     (use-local-map ggtags-global-rerun-search-map)
-    (setq-local ggtags-navigation-mode nil)
+    (setq-local ggtags-enable-navigation-keys nil)
     (setq-local bookmark-make-record-function #'ggtags-make-bookmark-record)
     (setq truncate-lines t)
     (cl-labels ((prop (s) (propertize s 'face 'minibuffer-prompt))
@@ -1290,8 +1291,7 @@ commands `next-error' and `previous-error'.
   (cl-incf ggtags-global-output-lines
            (count-lines compilation-filter-start (point)))
   (when (and (> ggtags-global-output-lines 5) ggtags-navigation-mode)
-    (ggtags-global--display-buffer)
-    (setq-local ggtags-navigation-mode nil))
+    (ggtags-global--display-buffer))
   (when (and (eq ggtags-auto-jump-to-match 'history)
              (numberp ggtags-auto-jump-to-match-target)
              ;; `ggtags-global-output-lines' is imprecise.
@@ -1368,6 +1368,7 @@ commands `next-error' and `previous-error'.
   (add-hook 'compilation-filter-hook 'ggtags-global-filter nil 'local)
   (add-hook 'compilation-finish-functions 'ggtags-global-handle-exit nil t)
   (setq-local bookmark-make-record-function #'ggtags-make-bookmark-record)
+  (setq-local ggtags-enable-navigation-keys nil)
   (add-hook 'kill-buffer-hook (lambda () (ggtags-navigation-mode -1)) nil t))
 
 ;; NOTE: Need this to avoid putting menu items in
@@ -1394,7 +1395,7 @@ commands `next-error' and `previous-error'.
     map))
 
 (defvar ggtags-mode-map-alist
-  `((ggtags-navigation-mode . ,ggtags-navigation-map)))
+  `((ggtags-enable-navigation-keys . ,ggtags-navigation-map)))
 
 (defvar ggtags-navigation-mode-map
   (let ((map (make-sparse-keymap))
@@ -1567,8 +1568,7 @@ commands `next-error' and `previous-error'.
       (progn
         ;; Higher priority for `ggtags-navigation-mode' to avoid being
         ;; hijacked by modes such as `view-mode'.
-        (unless ggtags-suppress-navigation-keys
-          (add-to-list 'emulation-mode-map-alists 'ggtags-mode-map-alist))
+        (add-to-list 'emulation-mode-map-alists 'ggtags-mode-map-alist)
         (add-hook 'next-error-hook 'ggtags-global-next-error-function)
         (add-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function))
     (setq emulation-mode-map-alists
@@ -1578,7 +1578,7 @@ commands `next-error' and `previous-error'.
 
 (defun ggtags-minibuffer-setup-function ()
   ;; Disable ggtags-navigation-mode in minibuffer.
-  (setq-local ggtags-navigation-mode nil))
+  (setq-local ggtags-enable-navigation-keys nil))
 
 (defun ggtags-kill-file-buffers (&optional interactive)
   "Kill all buffers visiting files in current project."
