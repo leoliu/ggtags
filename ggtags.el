@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.1
+;; Version: 0.8.2
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -308,6 +308,10 @@ properly update `ggtags-mode-map'."
 (defun ggtags-list-of-string-p (xs)
   "Return non-nil if XS is a list of strings."
   (cl-every #'stringp xs))
+
+(defsubst ggtags-echo (format-string &rest args)
+  "Print formatted text to echo area."
+  (let (message-log-max) (apply #'message format-string args)))
 
 (defun ggtags-forward-to-line (line)
   "Move to line number LINE in current buffer."
@@ -1062,15 +1066,14 @@ Use \\[jump-to-register] to restore the search session."
                        0))
                  (ring-length find-tag-marker-ring)))
   (let ((m (ring-ref find-tag-marker-ring ggtags-tag-ring-index))
-        (i (- (ring-length find-tag-marker-ring) ggtags-tag-ring-index))
-        (message-log-max nil))
-    (message "%d%s marker%s" i (pcase (mod i 10)
-                                 ;; ` required for 24.1 and 24.2
-                                 (`1 "st")
-                                 (`2 "nd")
-                                 (`3 "rd")
-                                 (_ "th"))
-             (if (marker-buffer m) "" " (dead)"))
+        (i (- (ring-length find-tag-marker-ring) ggtags-tag-ring-index)))
+    (ggtags-echo "%d%s marker%s" i (pcase (mod i 10)
+                                     ;; ` required for 24.1 and 24.2
+                                     (`1 "st")
+                                     (`2 "nd")
+                                     (`3 "rd")
+                                     (_ "th"))
+                 (if (marker-buffer m) "" " (dead)"))
     (if (not (marker-buffer m))
         (ding)
       (switch-to-buffer (marker-buffer m))
@@ -1323,9 +1326,8 @@ commands `next-error' and `previous-error'.
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
     (cl-incf ggtags-global-large-output 500)
-    (let ((message-log-max nil))
-      (message "Output %d lines (Type `C-c C-k' to cancel)"
-               ggtags-global-output-lines))))
+    (ggtags-echo "Output %d lines (Type `C-c C-k' to cancel)"
+                 ggtags-global-output-lines)))
 
 (defun ggtags-global-handle-exit (buf how)
   "A function for `compilation-finish-functions' (which see)."
@@ -1655,9 +1657,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     proc))
 
 (defun ggtags-show-definition-default (defs)
-  (let (message-log-max)
-    (message "%s%s" (or (caar defs) "[definition not found]")
-             (if (cdr defs) " [guess]" ""))))
+  (ggtags-echo "%s%s" (or (caar defs) "[definition not found]")
+               (if (cdr defs) " [guess]" "")))
 
 (defun ggtags-show-definition (name)
   (interactive (list (ggtags-read-tag 'definition current-prefix-arg)))
