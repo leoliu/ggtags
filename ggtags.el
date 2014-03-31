@@ -151,7 +151,7 @@ directory local variables is not enabled by default per
   :type '(repeat string)
   :group 'ggtags)
 
-(defcustom ggtags-auto-jump-to-match 'first
+(defcustom ggtags-auto-jump-to-match 'history
   "Strategy on how to jump to match: nil, first or history.
 
     nil: never automatically jump to any match;
@@ -1275,12 +1275,15 @@ commands `next-error' and `previous-error'.
 
 (defvar-local ggtags-global-output-lines 0)
 
-(defun ggtags-global--display-buffer (&optional buffer)
-  (let ((buffer (or buffer (current-buffer))))
-    (unless (get-buffer-window buffer)
-      (let* ((split-window-preferred-function ggtags-split-window-function)
-             (w (display-buffer buffer '(nil (allow-no-window . t)))))
-        (and w (compilation-set-window-height w))))))
+(defun ggtags-global--display-buffer (&optional buffer desired-point)
+  (pcase (let ((buffer (or buffer (current-buffer)))
+               (split-window-preferred-function ggtags-split-window-function))
+           (and (not (get-buffer-window buffer))
+                (display-buffer buffer '(nil (allow-no-window . t)))))
+    ((and (pred windowp) w)
+     (with-selected-window w
+       (compilation-set-window-height w)
+       (and desired-point (goto-char desired-point))))))
 
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
@@ -1303,10 +1306,11 @@ commands `next-error' and `previous-error'.
                         (point)))
   ;; If the number of output lines is small
   ;; `ggtags-global-handle-exit' takes care of displaying the buffer.
-  (when (and (> ggtags-global-output-lines 20) ggtags-navigation-mode)
-    (ggtags-global--display-buffer))
+  (when (and (> ggtags-global-output-lines 30) ggtags-navigation-mode)
+    (ggtags-global--display-buffer nil (or compilation-current-error (point-min))))
   (when (and (eq ggtags-auto-jump-to-match 'history)
              (numberp ggtags-auto-jump-to-match-target)
+             (not compilation-current-error)
              ;; `ggtags-global-output-lines' is imprecise but is
              ;; greater than (line-number-at-pos (point-max)) so use
              ;; it as first approximation.
