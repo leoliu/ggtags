@@ -61,7 +61,18 @@
   (defmacro ignore-errors-unless-debug (&rest body)
     "Ignore all errors while executing BODY unless debug is on."
     (declare (debug t) (indent 0))
-    `(condition-case-unless-debug nil (progn ,@body) (error nil))))
+    `(condition-case-unless-debug nil (progn ,@body) (error nil)))
+
+  (defmacro with-display-buffer-no-window (&rest body)
+    (declare (debug t) (indent 0))
+    ;; See http://debbugs.gnu.org/13594
+    `(let ((display-buffer-overriding-action
+            (if (and ggtags-auto-jump-to-match
+                     ;; Appeared in emacs 24.4.
+                     (fboundp 'display-buffer-no-window))
+                (list #'display-buffer-no-window)
+              display-buffer-overriding-action)))
+       ,@body)))
 
 (eval-and-compile
   (or (fboundp 'user-error)             ;24.3
@@ -702,13 +713,6 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
 (defun ggtags-global-start (command &optional directory)
   (let* ((default-directory (or directory (ggtags-current-project-root)))
          (split-window-preferred-function ggtags-split-window-function)
-         ;; See http://debbugs.gnu.org/13594
-         (display-buffer-overriding-action
-          (if (and ggtags-auto-jump-to-match
-                   ;; Appeared in emacs 24.4.
-                   (fboundp 'display-buffer-no-window))
-              (list #'display-buffer-no-window)
-            display-buffer-overriding-action))
          (env ggtags-process-environment))
     (setq ggtags-global-start-marker (point-marker))
     (setq ggtags-auto-jump-to-match-target
@@ -719,7 +723,8 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
           ggtags-global-match-count 0)
     (ggtags-update-tags)
     (ggtags-with-current-project
-     (with-current-buffer (compilation-start command 'ggtags-global-mode)
+     (with-current-buffer (with-display-buffer-no-window
+                           (compilation-start command 'ggtags-global-mode))
        (setq-local ggtags-process-environment env)
        (setq ggtags-global-last-buffer (current-buffer))))))
 
@@ -1289,12 +1294,20 @@ commands `next-error' and `previous-error'.
          compilation-filter-start t)
     (replace-match ""))
   (cl-incf ggtags-global-output-lines
-           (count-lines compilation-filter-start (point)))
-  (when (and (> ggtags-global-output-lines 5) ggtags-navigation-mode)
+           (count-lines (if (zerop ggtags-global-output-lines)
+                            (point-min)
+                          compilation-filter-start)
+                        (point)))
+  ;; If the number of output lines is small
+  ;; `ggtags-global-handle-exit' takes care of displaying the buffer.
+  (when (and (> ggtags-global-output-lines 20) ggtags-navigation-mode)
     (ggtags-global--display-buffer))
   (when (and (eq ggtags-auto-jump-to-match 'history)
              (numberp ggtags-auto-jump-to-match-target)
-             ;; `ggtags-global-output-lines' is imprecise.
+             ;; `ggtags-global-output-lines' is imprecise but is
+             ;; greater than (line-number-at-pos (point-max)) so use
+             ;; it as first approximation.
+             (> ggtags-global-output-lines ggtags-auto-jump-to-match-target)
              (> (line-number-at-pos (point-max))
                 ggtags-auto-jump-to-match-target))
     (ggtags-forward-to-line ggtags-auto-jump-to-match-target)
@@ -1304,7 +1317,8 @@ commands `next-error' and `previous-error'.
     ;; `compilation-filter' restores point and as a result commands
     ;; dependent on point such as `ggtags-navigation-next-file' and
     ;; `ggtags-navigation-previous-file' fail to work.
-    (setq-local compilation-auto-jump-to-first-error t)
+    (with-display-buffer-no-window
+     (with-demoted-errors (compile-goto-error)))
     (run-with-idle-timer 0 nil #'compilation-auto-jump (current-buffer) (point)))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
@@ -1319,18 +1333,20 @@ commands `next-error' and `previous-error'.
    ((string-prefix-p "exited abnormally" how)
     ;; If exit abnormally display the buffer for inspection.
     (ggtags-global--display-buffer))
-   ((and ggtags-auto-jump-to-match
-         (not (pcase (compilation-next-single-property-change
-                      (point-min) 'compilation-message)
-                ((and pt (guard pt))
-                 (compilation-next-single-property-change
-                  (save-excursion (goto-char pt) (end-of-line) (point))
-                  'compilation-message)))))
-    ;; For the `compilation-auto-jump' in idle timer to run.
-    ;; See also: http://debbugs.gnu.org/13829
-    (sit-for 0)
-    (ggtags-navigation-mode -1)
-    (ggtags-navigation-mode-cleanup buf 0))))
+   (ggtags-auto-jump-to-match
+    (if (pcase (compilation-next-single-property-change
+                (point-min) 'compilation-message)
+          ((and pt (guard pt))
+           (compilation-next-single-property-change
+            (save-excursion (goto-char pt) (end-of-line) (point))
+            'compilation-message)))
+        ;; There are multiple matches so pop up the buffer.
+        (ggtags-global--display-buffer)
+      ;; For the `compilation-auto-jump' in idle timer to run.
+      ;; See also: http://debbugs.gnu.org/13829
+      (sit-for 0)
+      (ggtags-navigation-mode -1)
+      (ggtags-navigation-mode-cleanup buf 0)))))
 
 (defvar ggtags-global-mode-font-lock-keywords
   '(("^Global \\(exited abnormally\\|interrupt\\|killed\\|terminated\\)\\(?:.*with code \\([0-9]+\\)\\)?.*"
