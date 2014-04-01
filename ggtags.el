@@ -48,6 +48,15 @@
 (require 'tabulated-list)               ;preloaded since 24.3
 
 (eval-when-compile
+  (unless (fboundp 'add-function)       ;24.4
+    (defmacro add-function (_where place function)
+      `(progn
+         (make-local-variable ,(cadr place))
+         (set ,(cadr place) ,function))))
+  (unless (fboundp 'remove-function)    ;24.4
+    (defmacro remove-function (place _function)
+      `(kill-local-variable ,(cadr place))))
+
   (unless (fboundp 'setq-local)
     (defmacro setq-local (var val)
       (list 'set (list 'make-local-variable (list 'quote var)) val)))
@@ -236,13 +245,21 @@ This affects `ggtags-find-file' and `ggtags-grep'."
   :type 'hook
   :group 'ggtags)
 
-(defcustom ggtags-show-definition-function #'ggtags-show-definition-default
-  "Function called by `ggtags-show-definition' to show definition.
+(defcustom ggtags-get-definition-function #'ggtags-get-definition-default
+  "Function called by `ggtags-show-definition' to get definition.
 It is passed a list of definition candidates of the form:
 
  (TEXT NAME FILE LINE)
 
-where TEXT is usually the source line of the definition."
+where TEXT is usually the source line of the definition.
+
+The return value is passed to `ggtags-print-definition-function'."
+  :type 'function
+  :group 'ggtags)
+
+(defcustom ggtags-print-definition-function
+  (lambda (s) (ggtags-echo "%s" (or s "[definition not found]")))
+  "Function used by `ggtags-show-definition' to print definition."
   :type 'function
   :group 'ggtags)
 
@@ -309,7 +326,7 @@ properly update `ggtags-mode-map'."
   "Return non-nil if XS is a list of strings."
   (cl-every #'stringp xs))
 
-(defsubst ggtags-echo (format-string &rest args)
+(defun ggtags-echo (format-string &rest args)
   "Print formatted text to echo area."
   (let (message-log-max) (apply #'message format-string args)))
 
@@ -1660,9 +1677,9 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (set-process-sentinel proc sentinel)
     proc))
 
-(defun ggtags-show-definition-default (defs)
-  (ggtags-echo "%s%s" (or (caar defs) "[definition not found]")
-               (if (cdr defs) " [guess]" "")))
+(defun ggtags-get-definition-default (defs)
+  (and (caar defs)
+       (concat (caar defs) (and (cdr defs) " [guess]"))))
 
 (defun ggtags-show-definition (name)
   (interactive (list (ggtags-read-tag 'definition current-prefix-arg)))
@@ -1670,7 +1687,11 @@ When finished invoke CALLBACK in BUFFER with process exit status."
   (let* ((re (cadr (assq 'grep ggtags-global-error-regexp-alist-alist)))
          (current (current-buffer))
          (buffer (get-buffer-create " *ggtags-definition*"))
-         (fn ggtags-show-definition-function)
+         ;; Need these bindings so that let-binding
+         ;; `ggtags-print-definition-function' can work see
+         ;; `ggtags-eldoc-function'.
+         (get-fn ggtags-get-definition-function)
+         (print-fn ggtags-print-definition-function)
          (show (lambda (_status)
                  (goto-char (point-min))
                  (let ((defs (cl-loop while (re-search-forward re nil t)
@@ -1681,7 +1702,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                                                     (string-to-number (match-string 2))))))
                    (kill-buffer buffer)
                    (with-current-buffer current
-                     (funcall fn defs))))))
+                     (funcall print-fn (funcall get-fn defs)))))))
     (ggtags-with-current-project
      (ggtags-global-output
       buffer
@@ -1828,11 +1849,21 @@ to nil disables displaying this information.")
         ;; Append to serve as a fallback method.
         (add-hook 'completion-at-point-functions
                   #'ggtags-completion-at-point t t)
+        ;; `eldoc-documentation-function-default' is only good for
+        ;; `emacs-lisp-mode'.
+        (when (and (eq eldoc-documentation-function
+                       'eldoc-documentation-function-default)
+                   (not (derived-mode-p 'emacs-lisp-mode)))
+          (setq-local eldoc-documentation-function #'ignore))
+        (add-function :after-until (local 'eldoc-documentation-function)
+                      #'ggtags-eldoc-function)
         (unless (memq 'ggtags-mode-line-project-name
                       mode-line-buffer-identification)
           (setq mode-line-buffer-identification
                 (append mode-line-buffer-identification
                         '(ggtags-mode-line-project-name)))))
+    (remove-function (local 'eldoc-documentation-function)
+                     #'ggtags-eldoc-function)
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
     (remove-hook 'completion-at-point-functions #'ggtags-completion-at-point t)
     (setq mode-line-buffer-identification
@@ -1886,6 +1917,24 @@ to nil disables displaying this information.")
                         (or (cdr bounds) (point))
                         (current-buffer))
           (overlay-put o 'category nil))))))
+
+;;; eldoc
+
+(defvar-local ggtags-eldoc-cache nil)
+
+(declare-function eldoc-message "eldoc")
+(defun ggtags-eldoc-function ()
+  (pcase (cons (ggtags-tag-at-point) ggtags-eldoc-cache)
+    (`(nil . ,_) nil)
+    (`(,_x ,_x) nil)
+    (`(,_x ,_x ,def) def)
+    (`(,tag . ,_)
+     (let* ((ggtags-print-definition-function
+             (lambda (s)
+               (setq ggtags-eldoc-cache (list tag s))
+               (eldoc-message s))))
+       (ggtags-show-definition tag)
+       nil))))
 
 ;;; imenu
 

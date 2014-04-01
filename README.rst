@@ -247,6 +247,15 @@ ggtags-browse-file-as-hypertext
 Integration with other packages
 +++++++++++++++++++++++++++++++
 
+* eldoc
+
+  If ``eldoc-mode`` is enabled it can use ``ggtags`` to show
+  definition. An example configuration:
+  
+  ::
+
+     (add-hook 'ggtags-mode-hook 'eldoc-mode)
+
 * imenu
 
   Emacs major modes usually have excellent support for ``imenu`` so
