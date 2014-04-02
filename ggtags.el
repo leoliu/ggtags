@@ -129,7 +129,8 @@ automatically switches to 'global --single-update'."
 (defcustom ggtags-include-pattern
   '("^\\s-*#\\(?:include\\|import\\)\\s-*[\"<]\\(?:[./]*\\)?\\(.*?\\)[\">]" . 1)
   "Pattern used to detect #include files.
-Value can be (REGEXP . SUB) or a function with no arguments."
+Value can be (REGEXP . SUB) or a function with no arguments.
+REGEXP should match from the beginning of line."
   :type '(choice (const :tag "Disable" nil)
                  (cons regexp integer)
                  function)
@@ -761,6 +762,20 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
   (ggtags-check-project)
   (ggtags-global-start (apply #'ggtags-global-build-command cmd args)))
 
+(defun ggtags-include-file ()
+  "Calculate the include file based on `ggtags-include-pattern'."
+  (pcase ggtags-include-pattern
+    (`nil nil)
+    ((pred functionp)
+     (funcall ggtags-include-pattern))
+    (`(,re . ,sub)
+     (save-excursion
+       (beginning-of-line)
+       (and (looking-at re) (match-string sub))))
+    (_ (warn "Invalid value for `ggtags-include-pattern':%s"
+             ggtags-include-pattern)
+       nil)))
+
 ;;;###autoload
 (defun ggtags-find-tag-dwim (name &optional what)
   "Find NAME by context.
@@ -771,14 +786,7 @@ the include file instead.
 When called interactively with a prefix arg, always find
 definition tags."
   (interactive
-   (let ((include (and (not current-prefix-arg)
-                       ggtags-include-pattern
-                       (save-excursion
-                         (beginning-of-line)
-                         (if (functionp ggtags-include-pattern)
-                             (funcall ggtags-include-pattern)
-                           (and (looking-at (car ggtags-include-pattern))
-                                (match-string (cdr ggtags-include-pattern))))))))
+   (let ((include (and (not current-prefix-arg) (ggtags-include-file))))
      (if include (list include 'include)
        (list (ggtags-read-tag 'definition current-prefix-arg)
              (and current-prefix-arg 'definition)))))
