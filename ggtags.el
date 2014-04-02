@@ -1647,6 +1647,12 @@ commands `next-error' and `previous-error'.
   "Asynchronously pipe the output of running CMDS to BUFFER.
 When finished invoke CALLBACK in BUFFER with process exit status."
   (or buffer (error "Output buffer required"))
+  (when (get-buffer-process (get-buffer buffer))
+    ;; Notice running multiple processes in the same buffer so that we
+    ;; can fix the caller. See for example `ggtags-eldoc-function'.
+    (message "Warning: detected %S already running in %S; interrupting..."
+             (get-buffer-process buffer) buffer)
+    (interrupt-process (get-buffer-process buffer)))
   (let* ((program (car cmds))
          (args (cdr cmds))
          (cutoff (and cutoff (+ cutoff (if (get-buffer buffer)
@@ -1910,17 +1916,17 @@ to nil disables displaying this information.")
 (declare-function eldoc-message "eldoc")
 (defun ggtags-eldoc-function ()
   "A function suitable for `eldoc-documentation-function' (which see)."
-  (pcase (cons (ggtags-tag-at-point) ggtags-eldoc-cache)
-    (`(nil . ,_) nil)
-    (`(,_x ,_x) nil)
-    (`(,_x ,_x ,def) def)
-    (`(,tag . ,_)
-     (let* ((ggtags-print-definition-function
-             (lambda (s)
-               (setq ggtags-eldoc-cache (list tag s))
-               (eldoc-message s))))
-       (ggtags-show-definition tag)
-       nil))))
+  (pcase (ggtags-tag-at-point)
+    (`nil nil)
+    (tag (if (equal tag (car ggtags-eldoc-cache))
+             (cadr ggtags-eldoc-cache)
+           (setq ggtags-eldoc-cache (list tag)) ;don't come back until done
+           (let* ((ggtags-print-definition-function
+                   (lambda (s)
+                     (setq ggtags-eldoc-cache (list tag s))
+                     (eldoc-message s))))
+             (ggtags-show-definition tag)
+             nil)))))
 
 ;;; imenu
 
