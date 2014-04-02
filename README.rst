@@ -249,13 +249,13 @@ Integration with other packages
 
 * eldoc
 
-  If ``eldoc-mode`` is enabled it can use ``ggtags`` to show
-  definition. An example configuration:
-  
+  ``Eldoc`` support can be enabled by, for example, setting this in
+  the desired major mode with:
+
   ::
 
-     (add-hook 'ggtags-mode-hook 'eldoc-mode)
-
+     (setq-local eldoc-documentation-function #'ggtags-eldoc-function)
+  
 * imenu
 
   Emacs major modes usually have excellent support for ``imenu`` so
