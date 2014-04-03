@@ -778,6 +778,7 @@ When called interactively with a prefix arg, always find
 definition tags."
   (interactive
    (let ((include (and (not current-prefix-arg) (ggtags-include-file))))
+     (ggtags-ensure-project)
      (if include (list include 'include)
        (list (ggtags-read-tag 'definition current-prefix-arg)
              (and current-prefix-arg 'definition)))))
@@ -1920,13 +1921,16 @@ to nil disables displaying this information.")
     (`nil nil)
     (tag (if (equal tag (car ggtags-eldoc-cache))
              (cadr ggtags-eldoc-cache)
-           (setq ggtags-eldoc-cache (list tag)) ;don't come back until done
-           (let* ((ggtags-print-definition-function
-                   (lambda (s)
-                     (setq ggtags-eldoc-cache (list tag s))
-                     (eldoc-message s))))
-             (ggtags-show-definition tag)
-             nil)))))
+           (and ggtags-project-root (ggtags-find-project)
+                (let* ((ggtags-print-definition-function
+                        (lambda (s)
+                          (setq ggtags-eldoc-cache (list tag s))
+                          (eldoc-message s))))
+                  ;; Prevent multiple runs of ggtags-show-definition
+                  ;; for the same tag.
+                  (setq ggtags-eldoc-cache (list tag))
+                  (ggtags-show-definition tag)
+                  nil))))))
 
 ;;; imenu
 
