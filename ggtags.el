@@ -318,6 +318,9 @@ properly update `ggtags-mode-map'."
   "Return non-nil if XS is a list of strings."
   (cl-every #'stringp xs))
 
+(defun ggtags-ensure-localname (file)
+  (and file (or (file-remote-p file 'localname) file)))
+
 (defun ggtags-echo (format-string &rest args)
   "Print formatted text to echo area."
   (let (message-log-max) (apply #'message format-string args)))
@@ -550,7 +553,8 @@ Value is new modtime if updated."
         (root (make-symbol "-ggtags-project-root-")))
     `(let* ((,root ggtags-project-root)
             (,gtagsroot (when (ggtags-find-project)
-                          (directory-file-name (ggtags-current-project-root))))
+                          (ggtags-ensure-localname
+                           (directory-file-name (ggtags-current-project-root)))))
             (process-environment
              (append (let ((process-environment process-environment))
                        (and ,gtagsroot (setenv "GTAGSROOT" ,gtagsroot))
@@ -579,28 +583,33 @@ source trees. See Info node `(global)gtags' for details."
   (interactive "DRoot directory: ")
   (let ((process-environment process-environment))
     (when (zerop (length root)) (error "No root directory provided"))
-    (setenv "GTAGSROOT" (expand-file-name
-                         (directory-file-name (file-name-as-directory root))))
+    (setenv "GTAGSROOT" (ggtags-ensure-localname
+                         (expand-file-name
+                          (directory-file-name (file-name-as-directory root)))))
     (ggtags-with-current-project
      (let ((conf (and ggtags-use-project-gtagsconf
                       (cl-loop for name in '(".globalrc" "gtags.conf")
                                for full = (expand-file-name name root)
                                thereis (and (file-exists-p full) full)))))
-       (cond (conf (setenv "GTAGSCONF" conf))
-             ((and (not (getenv "GTAGSLABEL"))
-                   (yes-or-no-p "Use `ctags' backend? "))
-              (setenv "GTAGSLABEL" "ctags"))))
-     (with-temp-message "`gtags' in progress..."
-       (let ((default-directory (file-name-as-directory root)))
-         (condition-case err
-             (apply #'ggtags-process-string
-                    "gtags" (and ggtags-use-idutils '("--idutils")))
-           (error (if (and ggtags-use-idutils
-                           (stringp (cadr err))
-                           (string-match-p "mkid not found" (cadr err)))
-                      ;; Retry without mkid
-                      (ggtags-process-string "gtags")
-                    (signal (car err) (cdr err))))))))
+       (unless (or conf (getenv "GTAGSLABEL")
+                   (not (yes-or-no-p "Use `ctags' backend? ")))
+         (setenv "GTAGSLABEL" "ctags"))
+       (with-temp-message "`gtags' in progress..."
+         (let ((default-directory (file-name-as-directory root))
+               (args (cl-remove-if
+                      ;; Place --idutils first
+                      #'null (list (and ggtags-use-idutils "--idutils")
+                                   (and conf "--gtagsconf")
+                                   (and conf (ggtags-ensure-localname conf))))))
+           (condition-case err
+               (apply #'ggtags-process-string "gtags" args)
+             (error (if (and ggtags-use-idutils
+                             (stringp (cadr err))
+                             (string-match-p "mkid not found" (cadr err)))
+                        ;; Retry without mkid
+                        (apply #'ggtags-process-string
+                               "gtags" (cl-remove "--idutils" args))
+                      (signal (car err) (cdr err)))))))))
     (message "GTAGS generated in `%s'" root)
     root))
 
