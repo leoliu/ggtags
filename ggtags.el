@@ -359,15 +359,13 @@ properly update `ggtags-mode-map'."
                               (:copier nil)
                               (:type vector)
                               :named)
-  root config tag-size has-refs has-path-style has-color dirty-p mtime timestamp)
+  root tag-size has-refs has-path-style has-color dirty-p mtime timestamp)
 
 (defun ggtags-make-project (root)
   (cl-check-type root string)
   (pcase (nthcdr 5 (file-attributes (expand-file-name "GTAGS" root)))
     (`(,mtime ,_ ,tag-size . ,_)
      (let* ((default-directory (file-name-as-directory root))
-            (config (cl-some (lambda (c) (and (file-exists-p c) c))
-                             '(".globalrc" "gtags.conf")))
             (rtags-size (nth 7 (file-attributes "GRTAGS")))
             (has-refs
              (when rtags-size
@@ -391,7 +389,6 @@ properly update `ggtags-mode-map'."
                     'has-color))))
        (puthash default-directory
                 (ggtags-project--make :root default-directory
-                                      :config config
                                       :tag-size tag-size
                                       :has-refs has-refs
                                       :has-path-style has-path-style
@@ -562,13 +559,7 @@ Value is new modtime if updated."
                      (and ,gtagsroot (list (concat "GTAGSROOT=" ,gtagsroot)))
                      (and (ggtags-find-project)
                           (not (ggtags-project-has-refs (ggtags-find-project)))
-                          (list "GTAGSLABEL=ctags"))
-                     (and ggtags-use-project-gtagsconf ,gtagsroot
-                          (ggtags-project-config (ggtags-find-project))
-                          (list (concat "GTAGSCONF="
-                                        (expand-file-name (ggtags-project-config
-                                                           (ggtags-find-project))
-                                                          ,gtagsroot)))))))
+                          (list "GTAGSLABEL=ctags")))))
        (unwind-protect (save-current-buffer ,@body)
          (setq ggtags-project-root ,root)))))
 
