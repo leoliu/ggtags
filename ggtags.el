@@ -305,6 +305,17 @@ properly update `ggtags-mode-map'."
 
 (defvar ggtags-highlight-tag-timer nil)
 
+(defmacro ggtags-with-temp-message (message &rest body)
+  (declare (debug t) (indent 1))
+  (let ((init-time (make-symbol "-init-time-"))
+        (tmp-msg (make-symbol "-tmp-msg-")))
+    `(let ((,init-time (float-time))
+           (,tmp-msg ,message))
+       (with-temp-message ,tmp-msg
+         (prog1 (progn ,@body)
+           (message "%sdone (%.2fs)" ,(or tmp-msg "")
+                    (- (float-time) ,init-time)))))))
+
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
   `(progn
@@ -594,7 +605,7 @@ source trees. See Info node `(global)gtags' for details."
        (unless (or conf (getenv "GTAGSLABEL")
                    (not (yes-or-no-p "Use `ctags' backend? ")))
          (setenv "GTAGSLABEL" "ctags"))
-       (with-temp-message "`gtags' in progress..."
+       (ggtags-with-temp-message "`gtags' in progress..."
          (let ((default-directory (file-name-as-directory root))
                (args (cl-remove-if
                       ;; Place --idutils first
@@ -625,7 +636,7 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
                        (not (ggtags-project-oversize-p))
                        (ggtags-project-dirty-p (ggtags-find-project))))
     (ggtags-with-current-project
-     (with-temp-message "`global -u' in progress..."
+     (ggtags-with-temp-message "`global -u' in progress..."
        (ggtags-process-string "global" "-u")
        (setf (ggtags-project-dirty-p (ggtags-find-project)) nil)
        (setf (ggtags-project-mtime (ggtags-find-project)) (float-time))))))
@@ -875,7 +886,7 @@ Global and Emacs."
   (let ((file-form
          '(let ((files))
             (ggtags-ensure-global-buffer
-              (with-temp-message "Waiting for Grep to finish..."
+              (ggtags-with-temp-message "Waiting for Grep to finish..."
                 (while (get-buffer-process (current-buffer))
                   (sit-for 0.2)))
               (goto-char (point-min))
