@@ -748,7 +748,7 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
     (ggtags-update-tags)
     (ggtags-with-current-project
      (with-current-buffer (with-display-buffer-no-window
-                            (compilation-start command 'ggtags-global-mode))
+                           (compilation-start command 'ggtags-global-mode))
        (setq-local ggtags-process-environment env)
        (setq ggtags-global-last-buffer (current-buffer))))))
 
@@ -1313,12 +1313,6 @@ commands `next-error' and `previous-error'.
        (compilation-set-window-height w)
        (and desired-point (goto-char desired-point))))))
 
-(defun ggtags-auto-jump-to-match-target ()
-  (when (functionp ggtags-auto-jump-to-match-target)
-    (funcall (prog1 ggtags-auto-jump-to-match-target
-               (setq-local ggtags-auto-jump-to-match-target nil)))
-    t))
-
 (defun ggtags-global-filter ()
   "Called from `compilation-filter-hook' (which see)."
   (let ((ansi-color-apply-face-function
@@ -1348,17 +1342,15 @@ commands `next-error' and `previous-error'.
              (> (line-number-at-pos (point-max))
                 ggtags-auto-jump-to-match-target))
     (ggtags-forward-to-line ggtags-auto-jump-to-match-target)
+    (setq-local ggtags-auto-jump-to-match-target nil)
+    ;;
     ;; Can't call `compile-goto-error' here becuase
     ;; `compilation-filter' restores point and as a result commands
     ;; dependent on point such as `ggtags-navigation-next-file' and
     ;; `ggtags-navigation-previous-file' fail to work.
-    (setq-local ggtags-auto-jump-to-match-target
-                (apply-partially
-                 (lambda (buf pt)
-                   (let ((compilation-auto-jump-to-first-error t))
-                     (with-display-buffer-no-window (compilation-auto-jump buf pt))))
-                 (current-buffer) (point)))
-    (run-with-idle-timer 0 nil #'ggtags-auto-jump-to-match-target))
+    (with-display-buffer-no-window
+     (with-demoted-errors (compile-goto-error)))
+    (run-with-idle-timer 0 nil #'compilation-auto-jump (current-buffer) (point)))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
     (cl-incf ggtags-global-large-output 500)
@@ -1372,7 +1364,6 @@ commands `next-error' and `previous-error'.
     ;; If exit abnormally display the buffer for inspection.
     (ggtags-global--display-buffer))
    (ggtags-auto-jump-to-match
-    (ggtags-auto-jump-to-match-target)
     (if (pcase (compilation-next-single-property-change
                 (point-min) 'compilation-message)
           ((and pt (guard pt))
