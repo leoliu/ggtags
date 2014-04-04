@@ -316,6 +316,22 @@ properly update `ggtags-mode-map'."
            (message "%sdone (%.2fs)" ,(or tmp-msg "")
                     (- (float-time) ,init-time)))))))
 
+(defmacro ggtags-delay-finish-functions (&rest body)
+  "Delay running `compilation-finish-functions' until after BODY."
+  (declare (indent 0) (debug t))
+  (let ((saved (make-symbol "-saved-"))
+        (exit-args (make-symbol "-exit-args-")))
+    `(let ((,saved compilation-finish-functions)
+           ,exit-args)
+       (setq-local compilation-finish-functions nil)
+       (add-hook 'compilation-finish-functions
+                 (lambda (&rest args) (setq ,exit-args args))
+                 nil t)
+       (unwind-protect (progn ,@body)
+         (setq-local compilation-finish-functions ,saved)
+         (and ,exit-args (apply #'run-hook-with-args
+                                'compilation-finish-functions ,exit-args))))))
+
 (defmacro ggtags-ensure-global-buffer (&rest body)
   (declare (indent 0))
   `(progn
@@ -748,7 +764,7 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
     (ggtags-update-tags)
     (ggtags-with-current-project
      (with-current-buffer (with-display-buffer-no-window
-                           (compilation-start command 'ggtags-global-mode))
+                            (compilation-start command 'ggtags-global-mode))
        (setq-local ggtags-process-environment env)
        (setq ggtags-global-last-buffer (current-buffer))))))
 
@@ -1348,9 +1364,14 @@ commands `next-error' and `previous-error'.
     ;; `compilation-filter' restores point and as a result commands
     ;; dependent on point such as `ggtags-navigation-next-file' and
     ;; `ggtags-navigation-previous-file' fail to work.
-    (with-display-buffer-no-window
-     (with-demoted-errors (compile-goto-error)))
-    (run-with-idle-timer 0 nil #'compilation-auto-jump (current-buffer) (point)))
+    (run-with-idle-timer 0 nil (lambda (buf pt)
+                                 (and (buffer-live-p buf)
+                                      (with-current-buffer buf
+                                        (ggtags-delay-finish-functions
+                                          (let ((compilation-auto-jump-to-first-error t))
+                                            (with-display-buffer-no-window
+                                              (compilation-auto-jump buf pt)))))))
+                         (current-buffer) (point)))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
     (cl-incf ggtags-global-large-output 500)
