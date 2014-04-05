@@ -197,7 +197,9 @@ If an integer abbreviate only names longer than that number."
   :group 'ggtags)
 
 (defcustom ggtags-global-use-color t
-  "Non-nil to use color in output if supported by Global."
+  "Non-nil to use color in output if supported by Global.
+Note: processing colored output takes noticeable time
+particularly when the output is large."
   :type 'boolean
   :safe 'booleanp
   :group 'ggtags)
@@ -1784,6 +1786,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (define-key menu [custom-ggtags]
       '(menu-item "Customize Ggtags"
                   (lambda () (interactive) (customize-group 'ggtags))))
+    (define-key menu [eldoc-mode]
+      '(menu-item "Toggle eldoc mode" eldoc-mode :button (:toggle . eldoc-mode)))
     (define-key menu [save-project]
       '(menu-item "Save project settings" ggtags-save-project-settings))
     (define-key menu [toggle-read-only]
@@ -1812,9 +1816,9 @@ When finished invoke CALLBACK in BUFFER with process exit status."
       '(menu-item "Previous mark" ggtags-prev-mark))
     (define-key menu [sep1] menu-bar-separator)
     (define-key menu [rerun-search]
-      '(menu-item "Rerun past search" ggtags-global-rerun-search))
+      '(menu-item "Re-run past search" ggtags-global-rerun-search))
     (define-key menu [save-to-register]
-      '(menu-item "Save search session" ggtags-save-to-register))
+      '(menu-item "Save search to register" ggtags-save-to-register))
     (define-key menu [previous-error]
       '(menu-item "Previous match" previous-error))
     (define-key menu [next-error]

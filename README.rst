@@ -33,6 +33,7 @@ Features
 #. Support all Global's output formats: ``grep``, ``ctags-x``,
    ``cscope`` etc.
 #. Support projects on remote hosts (e.g. via ``tramp``)
+#. Support eldoc
 
 Screenshot
 ~~~~~~~~~~
@@ -255,7 +256,7 @@ Integration with other packages
   ::
 
      (setq-local eldoc-documentation-function #'ggtags-eldoc-function)
-  
+
 * imenu
 
   Emacs major modes usually have excellent support for ``imenu`` so
@@ -270,8 +271,24 @@ Integration with other packages
      (setq-local hippie-expand-try-functions-list
                  (cons 'ggtags-try-complete-tag hippie-expand-try-functions-list))
 
+* company
+
+  ``company`` can use ``ggtags`` as completion source via
+  ``company-capf`` (enabled by default in emacs 24.4).
+
+* helm
+
+  If ``helm-mode`` is enabled ``ggtags`` will use it for completion.
+
 NEWS
 ~~~~
+
+[2014-04-05 Sat] 0.8.2
+++++++++++++++++++++++
+
+#. Default ``ggtags-auto-jump-to-match`` to ``history``.
+#. Add eldoc support; see ``ggtags-eldoc-function``.
+#. Improved support for tramp.
 
 [2014-03-30 Sun] 0.8.1
 ++++++++++++++++++++++
