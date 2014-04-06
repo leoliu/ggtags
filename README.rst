@@ -236,7 +236,7 @@ ggtags-visit-project-root
 
    Open the project root directory in ``dired``.
 
-ggtags-delete-tag-files
+ggtags-delete-tags
 
    Delete the GTAGS, GRTAGS, GPATH and ID files of current project.
 
