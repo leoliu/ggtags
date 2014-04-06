@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.2
+;; Version: 0.8.3
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -792,7 +792,7 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
      (save-excursion
        (beginning-of-line)
        (and (looking-at re) (match-string sub))))
-    (_ (warn "Invalid value for `ggtags-include-pattern':%s"
+    (_ (warn "Invalid value for `ggtags-include-pattern': %s"
              ggtags-include-pattern)
        nil)))
 
@@ -811,7 +811,7 @@ definition tags."
      (if include (list include 'include)
        (list (ggtags-read-tag 'definition current-prefix-arg)
              (and current-prefix-arg 'definition)))))
-  (ggtags-check-project)     ; for `ggtags-current-project-root' below
+  (ggtags-check-project)     ; For `ggtags-current-project-root' below.
   (cond
    ((eq what 'include)
     (ggtags-find-file name))
@@ -1306,7 +1306,7 @@ commands `next-error' and `previous-error'.
 
 (defun ggtags-abbreviate-files (start end)
   (goto-char start)
-  (let* ((error-re (cdr (assq ggtags-global-output-format
+  (let* ((error-re (cdr (assq (car compilation-error-regexp-alist)
                               ggtags-global-error-regexp-alist-alist)))
          (sub (cadr error-re)))
     (when (and ggtags-global-abbreviate-filename error-re)
@@ -1411,10 +1411,9 @@ commands `next-error' and `previous-error'.
 
 (define-compilation-mode ggtags-global-mode "Global"
   "A mode for showing outputs from gnu global."
-  ;; Make it buffer local for `ggtags-abbreviate-files'.
-  (make-local-variable 'ggtags-global-output-format)
-  (setq-local compilation-error-regexp-alist
-              (list ggtags-global-output-format))
+  ;; Note: Place `ggtags-global-output-format' as first element for
+  ;; `ggtags-abbreviate-files'.
+  (setq-local compilation-error-regexp-alist (list ggtags-global-output-format))
   (pcase ggtags-auto-jump-to-match
     (`history (make-local-variable 'ggtags-auto-jump-to-match-target)
               (setq-local compilation-auto-jump-to-first-error
