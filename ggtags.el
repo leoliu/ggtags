@@ -766,8 +766,6 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
 
 ;; takes three values: nil, t and a marker
 (defvar ggtags-global-start-marker nil)
-(defvar ggtags-global-exit-status 0)
-(defvar ggtags-global-match-count 0)
 (defvar ggtags-tag-ring-index nil)
 (defvar ggtags-global-search-history nil)
 
@@ -788,8 +786,6 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
           (nth 4 (assoc (ggtags-global-search-id command default-directory)
                         ggtags-global-search-history)))
     (ggtags-navigation-mode +1)
-    (setq ggtags-global-exit-status 0
-          ggtags-global-match-count 0)
     (ggtags-update-tags)
     (ggtags-with-current-project
      (with-current-buffer (with-display-buffer-no-window
@@ -1223,41 +1219,46 @@ commands `next-error' and `previous-error'.
      (goto-char (marker-position m)))
     (_ (error "Dead marker"))))
 
+(defun ggtags-global-exit-message-1 ()
+  "Get the total of matches and db file used."
+  (save-excursion
+    (goto-char (point-max))
+    (if (re-search-backward
+         "^\\w+ \\(not found\\)\\|^\\([0-9]+\\) \\w+ located" nil t)
+        (cons (or (and (match-string 1) 0)
+                  (string-to-number (match-string 2)))
+              (when (re-search-forward
+                     "using \\(?:\\(idutils\\)\\|'[^']*/\\(\\w+\\)'\\)"
+                     (line-end-position)
+                     t)
+                (or (and (match-string 1) "ID")
+                    (match-string 2))))
+      (cons 0 nil))))
+
+(defvar-local ggtags-global-exit-info nil) ; (EXIT-STATUS COUNT DB)
+
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
-  (setq ggtags-global-exit-status exit-status)
-  (pcase-let ((`(,count . ,db)
-               (save-excursion
-                 (goto-char (point-max))
-                 (if (re-search-backward
-                      "^\\w+ \\(not found\\)\\|^\\([0-9]+\\) \\w+ located" nil t)
-                     (cons (or (and (match-string 1) 0)
-                               (string-to-number (match-string 2)))
-                           (when (re-search-forward
-                                  "using \\(?:\\(idutils\\)\\|'[^']*/\\(\\w+\\)'\\)"
-                                  (line-end-position)
-                                  t)
-                             (or (and (match-string 1) "ID")
-                                 (match-string 2))))
-                   (cons 0 nil)))))
-    (setq ggtags-global-match-count count)
-    ;; Clear the start marker in case of zero matches.
-    (and (zerop count)
-         (markerp ggtags-global-start-marker)
-         (setq ggtags-global-start-marker nil))
-    (cons (if (> exit-status 0)
-              msg
-            (format "found %d %s"
-                    count
-                    (funcall (if (= count 1) #'car #'cadr)
-                             (pcase db
-                               ;; ` required for 24.1 and 24.2
-                               (`"GTAGS"  '("definition" "definitions"))
-                               (`"GSYMS"  '("symbol"     "symbols"))
-                               (`"GRTAGS" '("reference"  "references"))
-                               (`"GPATH"  '("file"       "files"))
-                               (`"ID"     '("identifier" "identifiers"))
-                               (_         '("match"      "matches"))))))
-          exit-status)))
+  "A function for `compilation-exit-message-function'."
+  (pcase (ggtags-global-exit-message-1)
+    (`(,count . ,db)
+     (setq ggtags-global-exit-info (list exit-status count db))
+     ;; Clear the start marker in case of zero matches.
+     (and (zerop count)
+          (markerp ggtags-global-start-marker)
+          (setq ggtags-global-start-marker nil))
+     (cons (if (> exit-status 0)
+               msg
+             (format "found %d %s" count
+                     (funcall (if (= count 1) #'car #'cadr)
+                              (pcase db
+                                ;; ` required for 24.1 and 24.2
+                                (`"GTAGS"  '("definition" "definitions"))
+                                (`"GSYMS"  '("symbol"     "symbols"))
+                                (`"GRTAGS" '("reference"  "references"))
+                                (`"GPATH"  '("file"       "files"))
+                                (`"ID"     '("identifier" "identifiers"))
+                                (_         '("match"      "matches"))))))
+           exit-status))))
 
 (defun ggtags-global-column (start)
   ;; START is the beginning position of source text.
@@ -1612,25 +1613,39 @@ commands `next-error' and `previous-error'.
                           ggtags-global-history-length))))
     (run-hooks 'ggtags-find-tag-hook)))
 
+(put 'ggtags-navigation-mode-lighter 'risky-local-variable t)
+
+(defvar ggtags-navigation-mode-lighter
+  '(" GG["
+    (:eval
+     (if (not (buffer-live-p ggtags-global-last-buffer))
+         '(:propertize "??" face error help-echo "No Global buffer")
+       (with-current-buffer ggtags-global-last-buffer
+         (pcase (or ggtags-global-exit-info '(0 0 ""))
+           (`(,exit ,count ,db)
+            `((:propertize ,(pcase db
+                              (`"GTAGS"  "D")
+                              (`"GRTAGS" "R")
+                              (`"GSYMS"  "S")
+                              (`"GPATH"  "F")
+                              (`"ID"     "I"))
+                           face success)
+              (:propertize
+               ,(pcase (get-text-property (line-beginning-position)
+                                          'compilation-message)
+                  (`nil "?")
+                  ;; Assume the first match appears at line 5
+                  (_ (number-to-string (- (line-number-at-pos) 4))))
+               face success)
+              "/"
+              (:propertize ,(number-to-string count) face success)
+              ,(unless (zerop exit)
+                 `(":" (:propertize ,(number-to-string exit) face error)))))))))
+    "]")
+  "Ligher for `ggtags-navigation-mode'; set to nil to disable it.")
+
 (define-minor-mode ggtags-navigation-mode nil
-  :lighter
-  (" GG[" (:eval
-           (ignore-errors
-             (ggtags-ensure-global-buffer
-               (let ((index (when (get-text-property (line-beginning-position)
-                                                     'compilation-message)
-                              ;; Assume the first match appears at line 5
-                              (- (line-number-at-pos) 4))))
-                 `((:propertize ,(if index
-                                     (number-to-string (max index 0))
-                                   "?") face success) "/")))))
-   (:propertize (:eval (number-to-string ggtags-global-match-count))
-                face success)
-   (:eval
-    (unless (zerop ggtags-global-exit-status)
-      `(":" (:propertize ,(number-to-string ggtags-global-exit-status)
-                         face error))))
-   "]")
+  :lighter ggtags-navigation-mode-lighter
   :global t
   (if ggtags-navigation-mode
       (progn
