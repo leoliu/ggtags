@@ -625,11 +625,10 @@ source trees. See Info node `(global)gtags' for details."
          (setenv "GTAGSLABEL" "ctags"))
        (ggtags-with-temp-message "`gtags' in progress..."
          (let ((default-directory (file-name-as-directory root))
-               (args (cl-remove-if
-                      ;; Place --idutils first
-                      #'null (list (and ggtags-use-idutils "--idutils")
-                                   (and conf "--gtagsconf")
-                                   (and conf (ggtags-ensure-localname conf))))))
+               (args (cl-remove-if #'null
+                                   (list (and ggtags-use-idutils "--idutils")
+                                         (and conf "--gtagsconf")
+                                         (and conf (ggtags-ensure-localname conf))))))
            (condition-case err
                (apply #'ggtags-process-string "gtags" args)
              (error (if (and ggtags-use-idutils
@@ -764,7 +763,8 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
                     args)))
     (mapconcat #'identity (delq nil xs) " ")))
 
-;; takes three values: nil, t and a marker
+;; Can be three values: nil, t and a marker; t means start marker has
+;; been saved in the tag ring.
 (defvar ggtags-global-start-marker nil)
 (defvar ggtags-tag-ring-index nil)
 (defvar ggtags-global-search-history nil)

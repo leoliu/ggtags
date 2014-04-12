@@ -283,6 +283,11 @@ Integration with other packages
 NEWS
 ~~~~
 
+[2014-04-12 Sat] 0.8.3
+++++++++++++++++++++++
+
+#. Tweak mode-line ligter in ``ggtags-navigation-mode``.
+
 [2014-04-05 Sat] 0.8.2
 ++++++++++++++++++++++
 
