@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.3
+;; Version: 0.8.4
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -577,7 +577,7 @@ Value is new modtime if updated."
 
 (defmacro ggtags-with-current-project (&rest body)
   "Eval BODY in current project's `process-environment'."
-  (declare (debug t))
+  (declare (debug t) (indent 0))
   (let ((gtagsroot (make-symbol "-gtagsroot-"))
         (root (make-symbol "-ggtags-project-root-")))
     `(let* ((,root ggtags-project-root)
@@ -1470,7 +1470,7 @@ commands `next-error' and `previous-error'.
     (define-key map "\M-}" 'ggtags-navigation-next-file)
     (define-key map "\M-{" 'ggtags-navigation-previous-file)
     (define-key map "\M->" 'ggtags-navigation-last-error)
-    (define-key map "\M-<" 'ggtags-navigation-first-error)
+    (define-key map "\M-<" 'first-error)
     ;; Note: shadows `isearch-forward-regexp' but it can be invoked
     ;; with C-u C-s instead.
     (define-key map "\C-\M-s" 'ggtags-navigation-isearch-forward)
@@ -1503,8 +1503,7 @@ commands `next-error' and `previous-error'.
       '(menu-item "Abort" ggtags-navigation-mode-abort))
     (define-key menu [last-match]
       '(menu-item "Last match" ggtags-navigation-last-error))
-    (define-key menu [first-match]
-      '(menu-item "First match" ggtags-navigation-first-error))
+    (define-key menu [first-match] '(menu-item "First match" first-error))
     (define-key menu [previous-file]
       '(menu-item "Previous file" ggtags-navigation-previous-file))
     (define-key menu [next-file]
@@ -1574,13 +1573,6 @@ commands `next-error' and `previous-error'.
 (defun ggtags-navigation-previous-file (n)
   (interactive "p")
   (ggtags-navigation-next-file (- n)))
-
-(defun ggtags-navigation-first-error ()
-  (interactive)
-  (ggtags-ensure-global-buffer
-    (goto-char (point-min))
-    (compilation-next-error 1)
-    (compile-goto-error)))
 
 (defun ggtags-navigation-last-error ()
   (interactive)
