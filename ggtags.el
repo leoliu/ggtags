@@ -111,12 +111,6 @@ automatically switches to 'global --single-update'."
                  number)
   :group 'ggtags)
 
-(defcustom ggtags-global-always-update nil
-  "If non-nil always update tags for current file on save."
-  :safe 'booleanp
-  :type 'boolean
-  :group 'ggtags)
-
 (defcustom ggtags-include-pattern
   '("^\\s-*#\\(?:include\\|import\\)\\s-*[\"<]\\(?:[./]*\\)?\\(.*?\\)[\">]" . 1)
   "Pattern used to detect #include files.
@@ -335,7 +329,7 @@ properly update `ggtags-mode-map'."
                                 'compilation-finish-functions ,exit-args))))))
 
 (defmacro ggtags-ensure-global-buffer (&rest body)
-  (declare (indent 0))
+  (declare (debug t) (indent 0))
   `(progn
      (or (and (buffer-live-p ggtags-global-last-buffer)
               (with-current-buffer ggtags-global-last-buffer
@@ -679,6 +673,7 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
        (setf (ggtags-project-mtime (ggtags-find-project)) (float-time))))))
 
 (defun ggtags-update-tags-single (file &optional nowait)
+  (cl-check-type file string)
   (ggtags-with-current-project
    (process-file (ggtags-program-path "global") nil (and nowait 0) nil
                  "--single-update" (ggtags-project-relative-file file))))
@@ -1554,6 +1549,7 @@ commands `next-error' and `previous-error'.
   (ggtags-navigation-mode-cleanup))
 
 (defun ggtags-navigation-mode-abort ()
+  "Abort navigation and return to where the search was started."
   (interactive)
   (ggtags-navigation-mode -1)
   (ggtags-navigation-mode-cleanup nil 0)
@@ -1697,10 +1693,8 @@ commands `next-error' and `previous-error'.
 (defun ggtags-after-save-function ()
   (when (ggtags-find-project)
     (ggtags-project-update-mtime-maybe)
-    ;; When oversize update on a per-save basis.
-    (when (and buffer-file-name
-               (or ggtags-global-always-update (ggtags-project-oversize-p)))
-      (ggtags-update-tags-single buffer-file-name 'nowait))))
+    (and buffer-file-name
+         (ggtags-update-tags-single buffer-file-name 'nowait))))
 
 (defun ggtags-global-output (buffer cmds callback &optional cutoff)
   "Asynchronously pipe the output of running CMDS to BUFFER.
