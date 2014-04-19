@@ -295,6 +295,8 @@ properly update `ggtags-mode-map'."
 
 (defvar ggtags-global-last-buffer nil)
 
+(defvar ggtags-global-continuation nil)
+
 (defvar ggtags-current-tag-name nil)
 
 (defvar ggtags-highlight-tag-overlay nil)
@@ -791,6 +793,8 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
 
 (defvar ggtags-auto-jump-to-match-target nil)
 
+(defvar-local ggtags-global-exit-info nil) ; (EXIT-STATUS COUNT DB)
+
 (defun ggtags-global-save-start-marker ()
   (when (markerp ggtags-global-start-marker)
     (setq ggtags-tag-ring-index nil)
@@ -801,7 +805,8 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
   (let* ((default-directory (or directory (ggtags-current-project-root)))
          (split-window-preferred-function ggtags-split-window-function)
          (env ggtags-process-environment))
-    (setq ggtags-global-start-marker (point-marker))
+    (unless (markerp ggtags-global-start-marker)
+      (setq ggtags-global-start-marker (point-marker)))
     (setq ggtags-auto-jump-to-match-target
           (nth 4 (assoc (ggtags-global-search-id command default-directory)
                         ggtags-global-search-history)))
@@ -872,13 +877,31 @@ definition tags."
                                 (ggtags-project-relative-file buffer-file-name)))
                        (shell-quote-argument name)))))
 
+(defun ggtags-setup-libpath-search (type name)
+  (pcase (ggtags-get-libpath)
+    ((and libs (guard libs))
+     (cl-labels ((cont (buf how)
+                       (pcase ggtags-global-exit-info
+                         (`(0 0 ,_)
+                          (with-temp-buffer
+                            (setq default-directory
+                                  (file-name-as-directory (pop libs)))
+                            (and libs (setq ggtags-global-continuation #'cont))
+                            (if (ggtags-find-project)
+                                (ggtags-find-tag type (shell-quote-argument name))
+                              (cont buf how))))
+                         (_ (ggtags-global-handle-exit buf how)))))
+       (setq ggtags-global-continuation #'cont)))))
+
 (defun ggtags-find-reference (name)
   (interactive (list (ggtags-read-tag 'reference current-prefix-arg)))
+  (ggtags-setup-libpath-search 'reference name)
   (ggtags-find-tag 'reference (shell-quote-argument name)))
 
 (defun ggtags-find-other-symbol (name)
   "Find tag NAME that is a reference without a definition."
   (interactive (list (ggtags-read-tag 'symbol current-prefix-arg)))
+  (ggtags-setup-libpath-search 'symbol name)
   (ggtags-find-tag 'symbol (shell-quote-argument name)))
 
 (defun ggtags-quote-pattern (pattern)
@@ -1250,8 +1273,6 @@ commands `next-error' and `previous-error'.
                     (match-string 2))))
       (cons 0 nil))))
 
-(defvar-local ggtags-global-exit-info nil) ; (EXIT-STATUS COUNT DB)
-
 (defun ggtags-global-exit-message-function (_process-status exit-status msg)
   "A function for `compilation-exit-message-function'."
   (pcase (ggtags-global-exit-message-1)
@@ -1260,6 +1281,7 @@ commands `next-error' and `previous-error'.
      ;; Clear the start marker in case of zero matches.
      (and (zerop count)
           (markerp ggtags-global-start-marker)
+          (not ggtags-global-continuation)
           (setq ggtags-global-start-marker nil))
      (cons (if (> exit-status 0)
                msg
@@ -1399,6 +1421,10 @@ commands `next-error' and `previous-error'.
 (defun ggtags-global-handle-exit (buf how)
   "A function for `compilation-finish-functions' (which see)."
   (cond
+   (ggtags-global-continuation
+    (let ((cont (prog1 ggtags-global-continuation
+                  (setq ggtags-global-continuation nil))))
+      (funcall cont buf how)))
    ((string-prefix-p "exited abnormally" how)
     ;; If exit abnormally display the buffer for inspection.
     (ggtags-global--display-buffer))
