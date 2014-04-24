@@ -274,7 +274,7 @@ Integration with other packages
 * company
 
   ``company`` can use ``ggtags`` as completion source via
-  ``company-capf`` (enabled by default in emacs 24.4).
+  ``company-capf`` which is enabled by default.
 
 * helm
 
