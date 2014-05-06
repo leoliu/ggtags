@@ -283,6 +283,14 @@ Integration with other packages
 NEWS
 ~~~~
 
+[2014-05-06 Tue] 0.8.4
+++++++++++++++++++++++
+
+#. ``M-.`` (``ggtags-find-tag-dwim``) is smarter on new files.
+#. Always update tags for current file on save.
+#. Can continue search ``GTAGSLIBPATH`` if search turns up 0 matches.
+   Customisable via ``ggtags-global-search-libpath-for-reference``.
+
 [2014-04-12 Sat] 0.8.3
 ++++++++++++++++++++++
 

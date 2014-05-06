@@ -211,6 +211,15 @@ This affects `ggtags-find-file' and `ggtags-grep'."
   :type 'boolean
   :group 'ggtags)
 
+;; See also https://github.com/leoliu/ggtags/issues/52
+(defcustom ggtags-global-search-libpath-for-reference t
+  "If non-nil global will search GTAGSLIBPATH for references.
+Search is only continued in GTAGSLIBPATH if it finds no matches
+in current project."
+  :safe 'booleanp
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-global-large-output 1000
   "Number of lines in the Global buffer to indicate large output."
   :type 'number
@@ -879,7 +888,8 @@ definition tags."
                        (shell-quote-argument name)))))
 
 (defun ggtags-setup-libpath-search (type name)
-  (pcase (ggtags-get-libpath)
+  (pcase (and ggtags-global-search-libpath-for-reference
+              (ggtags-get-libpath))
     ((and libs (guard libs))
      (cl-labels ((cont (buf how)
                    (pcase ggtags-global-exit-info
