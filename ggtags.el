@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.4
+;; Version: 0.8.5
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -875,8 +875,7 @@ definition tags."
     (ggtags-find-file name))
    ((or (eq what 'definition)
         (not buffer-file-name)
-        (and (ggtags-find-project)
-             (not (ggtags-project-has-refs (ggtags-find-project))))
+        (not (ggtags-project-has-refs (ggtags-find-project)))
         (not (ggtags-project-file-p buffer-file-name)))
     (ggtags-find-tag 'definition (shell-quote-argument name)))
    (t (ggtags-find-tag (format "--from-here=%d:%s"
@@ -886,6 +885,13 @@ definition tags."
                                 ;; default-directory to project root.
                                 (ggtags-project-relative-file buffer-file-name)))
                        (shell-quote-argument name)))))
+
+(defun ggtags-find-tag-mouse (event)
+  (interactive "e")
+  (with-selected-window (posn-window (event-start event))
+    (save-excursion
+      (goto-char (posn-point (event-start event)))
+      (call-interactively #'ggtags-find-tag-dwim))))
 
 (defun ggtags-setup-libpath-search (type name)
   (pcase (and ggtags-global-search-libpath-for-reference

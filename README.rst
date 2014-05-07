@@ -283,6 +283,11 @@ Integration with other packages
 NEWS
 ~~~~
 
+[devel] 0.8.5
++++++++++++++
+
+#. New command ``ggtags-find-tag-mouse`` for mouse support.
+
 [2014-05-06 Tue] 0.8.4
 ++++++++++++++++++++++
 
