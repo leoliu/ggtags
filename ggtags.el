@@ -122,9 +122,14 @@ REGEXP should match from the beginning of line."
   :safe 'stringp
   :group 'ggtags)
 
+;; See also: http://article.gmane.org/gmane.comp.gnu.global.bugs/1751
 (defcustom ggtags-use-project-gtagsconf t
   "Non-nil to use GTAGSCONF file found at project root.
-File .globalrc and gtags.conf are checked in order."
+File .globalrc and gtags.conf are checked in order.
+
+Note: GNU Global v6.2.13 has the feature of using gtags.conf at
+project root. Setting this variable to nil doesn't disable this
+feature."
   :safe 'booleanp
   :type 'boolean
   :group 'ggtags)
@@ -948,7 +953,8 @@ Invert the match when called with a prefix arg \\[universal-argument]."
     (ggtags-find-tag 'path (and invert-match "--invert-match")
                      "--" (ggtags-quote-pattern pattern))))
 
-;; NOTE: Coloured output in grep requested: http://goo.gl/Y9IcX
+;; Note: Coloured output requested in http://goo.gl/Y9IcX and appeared
+;; in global v6.2.12.
 (defun ggtags-find-tag-regexp (regexp directory)
   "List tags matching REGEXP in DIRECTORY (default to project root).
 When called interactively with a prefix, ask for the directory."
