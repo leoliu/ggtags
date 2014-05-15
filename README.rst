@@ -279,7 +279,8 @@ Integration with other packages
 
 * helm
 
-  If ``helm-mode`` is enabled ``ggtags`` will use it for completion.
+  If ``helm-mode`` is enabled ``ggtags`` will use it for completion if
+  ``ggtags-completing-read-function`` is nil.
 
 NEWS
 ~~~~
@@ -288,6 +289,7 @@ NEWS
 +++++++++++++
 
 #. New command ``ggtags-find-tag-mouse`` for mouse support.
+#. Variable ``ggtags-completing-read-function`` restored.
 
 [2014-05-06 Tue] 0.8.4
 ++++++++++++++++++++++

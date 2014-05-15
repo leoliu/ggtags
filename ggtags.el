@@ -102,9 +102,11 @@
 
 (defcustom ggtags-oversize-limit (* 10 1024 1024)
   "The over size limit for the  GTAGS file.
-For large source trees, running 'global -u' can be expensive.
-Thus when GTAGS file is larger than this limit, ggtags
-automatically switches to 'global --single-update'."
+When the size of the GTAGS file is below this limit, ggtags
+always maintains up-to-date tags for the whole source tree by
+running `global -u'. For projects with GTAGS larger than this
+limit, only files edited in Ggtags mode are updated (via `global
+--single-update')."
   :safe 'numberp
   :type '(choice (const :tag "None" nil)
                  (const :tag "Always" t)
@@ -284,6 +286,13 @@ properly update `ggtags-mode-map'."
                 (define-key ggtags-mode-map value ggtags-mode-prefix-map)))
          (set-default sym value))
   :type 'key-sequence
+  :group 'ggtags)
+
+(defcustom ggtags-completing-read-function nil
+  "Ggtags specific `completing-read-function' (which see).
+Nil means using the value of `completing-read-function'."
+  :type '(choice (const :tag "Use completing-read-function" nil)
+                 function)
   :group 'ggtags)
 
 (defcustom ggtags-highlight-tag-delay 0.25
@@ -769,9 +778,12 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
     (setq ggtags-current-tag-name
           (cond (confirm
                  (ggtags-update-tags)
-                 (completing-read
-                  (format (if default "%s (default %s): " "%s: ") prompt default)
-                  ggtags-completion-table nil require-match nil nil default))
+                 (let ((completing-read-function
+                        (or ggtags-completing-read-function
+                            completing-read-function)))
+                   (completing-read
+                    (format (if default "%s (default %s): " "%s: ") prompt default)
+                    ggtags-completion-table nil require-match nil nil default)))
                 (default (substring-no-properties default))
                 (t (ggtags-read-tag type t prompt require-match default))))))
 
