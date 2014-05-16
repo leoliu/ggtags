@@ -894,7 +894,7 @@ definition tags."
         (not buffer-file-name)
         (not (ggtags-project-has-refs (ggtags-find-project)))
         (not (ggtags-project-file-p buffer-file-name)))
-    (ggtags-find-tag 'definition (shell-quote-argument name)))
+    (ggtags-find-definition name))
    (t (ggtags-find-tag (format "--from-here=%d:%s"
                                (line-number-at-pos)
                                (shell-quote-argument
@@ -909,6 +909,11 @@ definition tags."
     (save-excursion
       (goto-char (posn-point (event-start event)))
       (call-interactively #'ggtags-find-tag-dwim))))
+
+;; Another option for `M-.'.
+(defun ggtags-find-definition (name)
+  (interactive (list (ggtags-read-tag 'definition current-prefix-arg)))
+  (ggtags-find-tag 'definition (shell-quote-argument name)))
 
 (defun ggtags-setup-libpath-search (type name)
   (pcase (and ggtags-global-search-libpath-for-reference

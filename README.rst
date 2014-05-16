@@ -118,14 +118,23 @@ ggtags-find-tag-dwim
 
    To force finding a definition tag, call it with a prefix (``C-u``).
 
+ggtags-find-tag-mouse
+
+   Like ``ggtags-find-tag-dwim`` but suitable for binding to mouse
+   events.
+
+ggtags-find-definition
+
+   Find definition tags. With ``C-u`` ask for the tag name with
+   completion.
+
 ggtags-find-reference
 
-   Find references to a tag. With ``C-u`` ask for the tag name with
-   completion.
+   Find reference tags. With ``C-u`` ask for the tag name with completion.
 
 ggtags-find-other-symbol
 
-   Find a tag that has no definition. With ``C-u`` ask for the tag
+   Find tags that have no definitions. With ``C-u`` ask for the tag
    name with completion.
 
 ggtags-find-tag-regexp
@@ -289,6 +298,7 @@ NEWS
 +++++++++++++
 
 #. New command ``ggtags-find-tag-mouse`` for mouse support.
+#. New command ``ggtags-find-definition``.
 #. Variable ``ggtags-completing-read-function`` restored.
 
 [2014-05-06 Tue] 0.8.4
