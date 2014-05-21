@@ -1468,7 +1468,17 @@ commands `next-error' and `previous-error'.
       (funcall cont buf how)))
    ((string-prefix-p "exited abnormally" how)
     ;; If exit abnormally display the buffer for inspection.
-    (ggtags-global--display-buffer))
+    (ggtags-global--display-buffer)
+    (when (save-excursion
+            (goto-char (point-max))
+            (re-search-backward
+             (eval-when-compile
+               (format "^global: %s not found.$"
+                       (regexp-opt '("GTAGS" "GRTAGS" "GSYMS" "GPATH"))))
+             nil t))
+      (ggtags-echo "WARNING: Global tag files missing in `%s'"
+                   ggtags-project-root)
+      (remhash ggtags-project-root ggtags-projects)))
    (ggtags-auto-jump-to-match
     (if (pcase (compilation-next-single-property-change
                 (point-min) 'compilation-message)
@@ -1497,6 +1507,10 @@ commands `next-error' and `previous-error'.
   ;; Note: Place `ggtags-global-output-format' as first element for
   ;; `ggtags-abbreviate-files'.
   (setq-local compilation-error-regexp-alist (list ggtags-global-output-format))
+  (when (markerp ggtags-global-start-marker)
+    (setq ggtags-project-root
+          (buffer-local-value 'ggtags-project-root
+                              (marker-buffer ggtags-global-start-marker))))
   (pcase ggtags-auto-jump-to-match
     (`history (make-local-variable 'ggtags-auto-jump-to-match-target)
               (setq-local compilation-auto-jump-to-first-error
