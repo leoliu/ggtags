@@ -641,6 +641,14 @@ Value is new modtime if updated."
       (goto-char (point-min))
       (not (re-search-forward "^file not found" nil t)))))
 
+(defun ggtags-invalidate-buffer-project-root (root)
+  (mapc (lambda (buf)
+          (with-current-buffer buf
+            (and buffer-file-truename
+                 (string-prefix-p root buffer-file-truename)
+                 (kill-local-variable 'ggtags-project-root))))
+        (buffer-list)))
+
 (defun ggtags-create-tags (root)
   "Create tag files (e.g. GTAGS) in directory ROOT.
 If file .globalrc or gtags.conf exists in ROOT, it will be used
@@ -678,6 +686,7 @@ source trees. See Info node `(global)gtags' for details."
                          (apply #'ggtags-process-string
                                 "gtags" (cl-remove "--idutils" args))
                        (signal (car err) (cdr err)))))))))
+    (ggtags-invalidate-buffer-project-root (file-truename root))
     (message "GTAGS generated in `%s'" root)
     root))
 
