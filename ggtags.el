@@ -1554,9 +1554,12 @@ commands `next-error' and `previous-error'.
     (define-key map "\M-{" 'ggtags-navigation-previous-file)
     (define-key map "\M->" 'ggtags-navigation-last-error)
     (define-key map "\M-<" 'first-error)
-    ;; Note: shadows `isearch-forward-regexp' but it can be invoked
-    ;; with C-u C-s instead.
+    ;; Note: shadows `isearch-forward-regexp' but it can still be
+    ;; invoked with `C-u C-s'.
     (define-key map "\C-\M-s" 'ggtags-navigation-isearch-forward)
+    ;; Add an alternative binding because C-M-s is reported not
+    ;; working on some systems.
+    (define-key map "\M-ss" 'ggtags-navigation-isearch-forward)
     (define-key map "\C-c\C-k"
       (lambda () (interactive)
         (ggtags-ensure-global-buffer (kill-compilation))))
