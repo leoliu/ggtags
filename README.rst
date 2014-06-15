@@ -302,7 +302,9 @@ NEWS
 #. Variable ``ggtags-completing-read-function`` restored.
 #. ``ggtags-navigation-isearch-forward`` can also be invoked using
    ``M-s s``.
-#. The output buffer from ``ggtags-global-rerun-search`` looks
+#. Command ``ggtags-global-rerun-search`` renamed to
+   ``ggtags-view-search-history``.
+#. The output buffer from ``ggtags-view-search-history`` looks
    cleaner.
 
 [2014-05-06 Tue] 0.8.4

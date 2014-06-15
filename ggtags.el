@@ -1047,7 +1047,7 @@ Global and Emacs."
           (buffer-substring-no-properties
            (line-beginning-position) (line-end-position)))))
 
-(defun ggtags-global-rerun-search-1 (data)
+(defun ggtags-global-rerun-search (data)
   (pcase data
     (`(,cmd ,dir ,env ,line ,_text)
      (with-current-buffer (let ((ggtags-auto-jump-to-match nil)
@@ -1065,59 +1065,62 @@ Global and Emacs."
                  nil t)))))
 
 (defvar-local ggtags-global-search-ewoc nil)
-(defvar ggtags-global-rerun-search-last nil)
+(defvar ggtags-view-search-history-last nil)
 
-(defvar ggtags-global-rerun-search-map
-  (cl-labels
-      ((save ()
-         (setq ggtags-global-rerun-search-last
-               (ewoc-data (ewoc-locate ggtags-global-search-ewoc))))
-       (next (arg)
-         (interactive "p")
-         (ewoc-goto-next ggtags-global-search-ewoc arg)
-         (save))
-       (prev (arg)
-         (interactive "p")
-         (ewoc-goto-prev ggtags-global-search-ewoc arg)
-         (save))
-       (quit ()
-         (interactive)
-         (quit-windows-on (ewoc-buffer ggtags-global-search-ewoc) t))
-       (done ()
-         (interactive)
-         (let ((node (ewoc-locate ggtags-global-search-ewoc)))
-           (when node
-             (save)
-             (quit)
-             (ggtags-global-rerun-search-1 (cdr (ewoc-data node)))))))
-    (let ((m (make-sparse-keymap)))
-      (set-keymap-parent m special-mode-map)
-      (define-key m "p"    #'prev)
-      (define-key m "\M-p" #'prev)
-      (define-key m "n"    #'next)
-      (define-key m "\M-n" #'next)
-      (define-key m "r"    #'ggtags-save-to-register)
-      (define-key m "q"    #'quit)
-      (define-key m "\r"   #'done)
-      m)))
+(defvar ggtags-view-search-history-mode-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m "p" 'ggtags-view-search-history-prev)
+    (define-key m "\M-p" 'ggtags-view-search-history-prev)
+    (define-key m "n" 'ggtags-view-search-history-next)
+    (define-key m "\M-n" 'ggtags-view-search-history-next)
+    (define-key m "r" 'ggtags-save-to-register)
+    (define-key m "\r" 'ggtags-view-search-history-action)
+    (define-key m "q" 'kill-buffer-and-window)
+    m))
+
+(defun ggtags-view-search-history-remember ()
+  (setq ggtags-view-search-history-last
+        (ewoc-data (ewoc-locate ggtags-global-search-ewoc))))
+
+(defun ggtags-view-search-history-next (&optional arg)
+  (interactive "p")
+  (let ((arg (or arg 1)))
+    (prog1 (funcall (if (cl-minusp arg) #'ewoc-goto-prev #'ewoc-goto-next)
+                    ggtags-global-search-ewoc (abs arg))
+      (ggtags-view-search-history-remember))))
+
+(defun ggtags-view-search-history-prev (&optional arg)
+  (interactive "p")
+  (ggtags-view-search-history-next (- (or arg 1))))
+
+(defun ggtags-view-search-history-action ()
+  (interactive)
+  (let ((data (ewoc-data (or (ewoc-locate ggtags-global-search-ewoc)
+                             (user-error "No search at point")))))
+    (ggtags-view-search-history-remember)
+    (quit-window t)
+    (ggtags-global-rerun-search (cdr data))))
 
 (defvar bookmark-make-record-function)
 
-(defun ggtags-global-rerun-search ()
-  "Pop up a buffer to choose a past search to re-run.
+(define-derived-mode ggtags-view-search-history-mode special-mode "SearchHist"
+  "Major mode for viewing search history."
+  :group 'ggtags
+  (setq-local ggtags-enable-navigation-keys nil)
+  (setq-local bookmark-make-record-function #'ggtags-make-bookmark-record)
+  (setq truncate-lines t))
 
-\\{ggtags-global-rerun-search-map}"
+(defun ggtags-view-search-history ()
+  "Pop to a buffer to view or re-run past searches.
+
+\\{ggtags-view-search-history-mode-map}"
   (interactive)
   (or ggtags-global-search-history (user-error "No search history"))
   (let ((split-window-preferred-function ggtags-split-window-function)
         (inhibit-read-only t))
     (pop-to-buffer "*Ggtags Search History*")
     (erase-buffer)
-    (special-mode)
-    (use-local-map ggtags-global-rerun-search-map)
-    (setq-local ggtags-enable-navigation-keys nil)
-    (setq-local bookmark-make-record-function #'ggtags-make-bookmark-record)
-    (setq truncate-lines t)
+    (ggtags-view-search-history-mode)
     (cl-labels ((prop (s)
                   (propertize s 'face 'minibuffer-prompt))
                 (prop-tag (cmd)
@@ -1141,8 +1144,8 @@ Global and Emacs."
             (ewoc-create #'pp "Global search history keys:  n:next  p:prev  r:register  RET:choose\n")))
     (dolist (data ggtags-global-search-history)
       (ewoc-enter-last ggtags-global-search-ewoc data))
-    (and ggtags-global-rerun-search-last
-         (re-search-forward (cadr ggtags-global-rerun-search-last) nil t)
+    (and ggtags-view-search-history-last
+         (re-search-forward (cadr ggtags-view-search-history-last) nil t)
          (ewoc-goto-node ggtags-global-search-ewoc
                          (ewoc-locate ggtags-global-search-ewoc)))
     (set-buffer-modified-p nil)
@@ -1161,7 +1164,7 @@ Use \\[jump-to-register] to restore the search session."
                      (if ggtags-global-search-ewoc
                          (cdr (ewoc-data (ewoc-locate ggtags-global-search-ewoc)))
                        (ggtags-global-current-search))
-                     :jump-func #'ggtags-global-rerun-search-1
+                     :jump-func #'ggtags-global-rerun-search
                      :print-func #'prn))))
 
 (defun ggtags-make-bookmark-record ()
@@ -1174,7 +1177,7 @@ Use \\[jump-to-register] to restore the search session."
 (declare-function bookmark-prop-get "bookmark")
 
 (defun ggtags-bookmark-jump (bmk)
-  (ggtags-global-rerun-search-1 (bookmark-prop-get bmk 'ggtags-search)))
+  (ggtags-global-rerun-search (bookmark-prop-get bmk 'ggtags-search)))
 
 (defun ggtags-browse-file-as-hypertext (file line)
   "Browse FILE in hypertext (HTML) form."
@@ -1234,7 +1237,7 @@ Use \\[jump-to-register] to restore the search session."
   (let ((m (make-sparse-keymap)))
     (define-key m "\M-n" 'next-error-no-select)
     (define-key m "\M-p" 'previous-error-no-select)
-    (define-key m "q" (lambda () (interactive) (quit-window t)))
+    (define-key m "q"    'kill-buffer-and-window)
     m))
 
 (define-derived-mode ggtags-view-tag-history-mode tabulated-list-mode "TagHist"
@@ -1888,7 +1891,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (define-key m "\M-k" 'ggtags-kill-file-buffers)
     (define-key m "\M-h" 'ggtags-view-tag-history)
     (define-key m "\M-j" 'ggtags-visit-project-root)
-    (define-key m "\M-/" 'ggtags-global-rerun-search)
+    (define-key m "\M-/" 'ggtags-view-search-history)
     (define-key m (kbd "M-SPC") 'ggtags-save-to-register)
     (define-key m (kbd "M-%") 'ggtags-query-replace)
     (define-key m "\M-?" 'ggtags-show-definition)
@@ -1948,7 +1951,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (define-key menu [next-error]
       '(menu-item "Next match" next-error))
     (define-key menu [rerun-search]
-      '(menu-item "Re-run past search" ggtags-global-rerun-search))
+      '(menu-item "View past searches" ggtags-view-search-history))
     (define-key menu [save-to-register]
       '(menu-item "Save search to register" ggtags-save-to-register))
     (define-key menu [find-file]
