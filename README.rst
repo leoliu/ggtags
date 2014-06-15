@@ -300,6 +300,10 @@ NEWS
 #. New command ``ggtags-find-tag-mouse`` for mouse support.
 #. New command ``ggtags-find-definition``.
 #. Variable ``ggtags-completing-read-function`` restored.
+#. ``ggtags-navigation-isearch-forward`` can also be invoked using
+   ``M-s s``.
+#. The output buffer from ``ggtags-global-rerun-search`` looks
+   cleaner.
 
 [2014-05-06 Tue] 0.8.4
 ++++++++++++++++++++++

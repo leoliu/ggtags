@@ -810,9 +810,9 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
                           (and ggtags-global-treat-text "--other")
                           (pcase cmd
                             ((pred stringp) cmd)
-                            (`definition "") ;-d not supported by Global 5.7.1
-                            (`reference "-r")
-                            (`symbol "-s")
+                            (`definition nil) ;-d not supported by Global 5.7.1
+                            (`reference "--reference")
+                            (`symbol "--symbol")
                             (`path "--path")
                             (`grep "--grep")
                             (`idutils "--idutils")))
@@ -1026,13 +1026,21 @@ Global and Emacs."
             (nreverse files))))
     (tags-query-replace from to delimited file-form)))
 
+(defun ggtags-global-normalise-command (cmd)
+  (if (string-match
+       (concat (regexp-quote (ggtags-global-build-command nil)) "\\s-*")
+       cmd)
+      (substring-no-properties cmd (match-end 0))
+    cmd))
+
 (defun ggtags-global-search-id (cmd directory)
-  (sha1 (concat directory (make-string 1 0) cmd)))
+  (sha1 (concat directory (make-string 1 0)
+                (ggtags-global-normalise-command cmd))))
 
 (defun ggtags-global-current-search ()
   ;; CMD DIR ENV LINE TEXT
   (ggtags-ensure-global-buffer
-    (list (car compilation-arguments)
+    (list (ggtags-global-normalise-command (car compilation-arguments))
           default-directory
           ggtags-process-environment
           (line-number-at-pos)
@@ -1047,7 +1055,8 @@ Global and Emacs."
                                 (default-directory dir)
                                 (ggtags-project-root dir)
                                 (ggtags-process-environment env))
-                            (ggtags-global-start cmd dir))
+                            (ggtags-global-start
+                             (ggtags-global-build-command cmd) dir))
        (add-hook 'compilation-finish-functions
                  (lambda (buf _msg)
                    (with-current-buffer buf
@@ -1111,10 +1120,19 @@ Global and Emacs."
     (setq truncate-lines t)
     (cl-labels ((prop (s)
                   (propertize s 'face 'minibuffer-prompt))
+                (prop-tag (cmd)
+                  (with-temp-buffer
+                    (insert cmd)
+                    (forward-sexp -1)
+                    (if (eobp)
+                        cmd
+                      (put-text-property (point) (point-max)
+                                         'face font-lock-constant-face)
+                      (buffer-string))))
                 (pp (data)
                   (pcase data
                     (`(,_id ,cmd ,dir ,_env ,line ,text)
-                     (insert (prop " cmd: ") cmd "\n"
+                     (insert (prop " cmd: ") (prop-tag cmd) "\n"
                              (prop " dir: ") dir "\n"
                              (prop "line: ") (number-to-string line) "\n"
                              (prop "text: ") text "\n"
