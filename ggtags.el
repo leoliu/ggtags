@@ -381,6 +381,11 @@ Nil means using the value of `completing-read-function'."
     (goto-char (point-min))
     (forward-line (1- line))))
 
+(defun ggtags-kill-window ()
+  "Quit selected window and kill its buffer."
+  (interactive)
+  (quit-window t))
+
 (defun ggtags-program-path (name)
   (if ggtags-executable-directory
       (expand-file-name name ggtags-executable-directory)
@@ -1078,12 +1083,14 @@ Global and Emacs."
     (define-key m "\C-c\C-c" 'ggtags-view-search-history-update)
     (define-key m "r" 'ggtags-save-to-register)
     (define-key m "\r" 'ggtags-view-search-history-action)
-    (define-key m "q" 'kill-buffer-and-window)
+    (define-key m "q" 'ggtags-kill-window)
     m))
 
 (defun ggtags-view-search-history-remember ()
   (setq ggtags-view-search-history-last
-        (ewoc-data (ewoc-locate ggtags-global-search-ewoc))))
+        (pcase (ewoc-locate ggtags-global-search-ewoc)
+          (`nil nil)
+          (node (ewoc-data node)))))
 
 (defun ggtags-view-search-history-next (&optional arg)
   (interactive "p")
@@ -1115,7 +1122,8 @@ Global and Emacs."
                  (if node
                      (ewoc-enter-before ggtags-global-search-ewoc
                                         node (cadr arg))
-                   (ewoc-enter-last ggtags-global-search-ewoc (cadr arg))))))
+                   (ewoc-enter-last ggtags-global-search-ewoc (cadr arg)))
+                 (setq ggtags-view-search-history-last (cadr arg)))))
            (list text (ewoc-data node)))
      text)
     (if append (kill-append text nil)
@@ -1126,10 +1134,12 @@ Global and Emacs."
 (defun ggtags-view-search-history-update (&optional noconfirm)
   "Update `ggtags-global-search-history' to current buffer."
   (interactive "P")
-  (when (or noconfirm
-            (yes-or-no-p "Modify `ggtags-global-search-history'?"))
+  (when (and (buffer-modified-p)
+             (or noconfirm
+                 (yes-or-no-p "Modify `ggtags-global-search-history'?")))
     (setq ggtags-global-search-history
-          (ewoc-collect ggtags-global-search-ewoc #'identity))))
+          (ewoc-collect ggtags-global-search-ewoc #'identity))
+    (set-buffer-modified-p nil)))
 
 (defun ggtags-view-search-history-action ()
   (interactive)
@@ -1146,7 +1156,16 @@ Global and Emacs."
   :group 'ggtags
   (setq-local ggtags-enable-navigation-keys nil)
   (setq-local bookmark-make-record-function #'ggtags-make-bookmark-record)
-  (setq truncate-lines t))
+  (setq truncate-lines t)
+  (add-hook 'kill-buffer-hook #'ggtags-view-search-history-update nil t))
+
+(defun ggtags-view-search-history-restore-last ()
+  (when ggtags-view-search-history-last
+    (cl-loop for n = (ewoc-nth ggtags-global-search-ewoc 0)
+             then (ewoc-next ggtags-global-search-ewoc n)
+             while n when (eq (ewoc-data n)
+                              ggtags-view-search-history-last)
+             do (progn (goto-char (ewoc-location n)) (cl-return t)))))
 
 (defun ggtags-view-search-history ()
   "Pop to a buffer to view or re-run past searches.
@@ -1182,10 +1201,7 @@ Global and Emacs."
             (ewoc-create #'pp "Global search history keys:  n:next  p:prev  r:register  RET:choose\n")))
     (dolist (data ggtags-global-search-history)
       (ewoc-enter-last ggtags-global-search-ewoc data))
-    (and ggtags-view-search-history-last
-         (re-search-forward (cadr ggtags-view-search-history-last) nil t)
-         (ewoc-goto-node ggtags-global-search-ewoc
-                         (ewoc-locate ggtags-global-search-ewoc)))
+    (ggtags-view-search-history-restore-last)
     (set-buffer-modified-p nil)
     (fit-window-to-buffer nil (floor (frame-height) 2))))
 
@@ -1275,7 +1291,7 @@ Use \\[jump-to-register] to restore the search session."
   (let ((m (make-sparse-keymap)))
     (define-key m "\M-n" 'next-error-no-select)
     (define-key m "\M-p" 'previous-error-no-select)
-    (define-key m "q"    'kill-buffer-and-window)
+    (define-key m "q"    'ggtags-kill-window)
     m))
 
 (define-derived-mode ggtags-view-tag-history-mode tabulated-list-mode "TagHist"

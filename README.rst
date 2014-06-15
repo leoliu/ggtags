@@ -192,7 +192,7 @@ turned on to facilitate locating the right match.
 
    Move to the last match.
 
-``C-M-s``
+``C-M-s`` or ``M-s s``
 
    Use ``isearch`` to find the match.
 
@@ -228,9 +228,9 @@ ggtags-view-tag-history
    location. ``M-n`` and ``M-p`` move to and display the next/previous
    entry.
 
-ggtags-global-rerun-search
+ggtags-view-search-history
 
-   Re-run a search from search history as kept in
+   View or re-run past searches as kept in
    ``ggtags-global-search-history``.
 
 ggtags-kill-file-buffers
