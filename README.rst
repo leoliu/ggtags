@@ -306,6 +306,7 @@ NEWS
    ``ggtags-view-search-history``.
 #. The output buffer from ``ggtags-view-search-history`` looks
    cleaner.
+#. Search history items can be re-arranged with ``C-k`` and ``C-y``.
 
 [2014-05-06 Tue] 0.8.4
 ++++++++++++++++++++++

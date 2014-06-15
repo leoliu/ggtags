@@ -1073,6 +1073,9 @@ Global and Emacs."
     (define-key m "\M-p" 'ggtags-view-search-history-prev)
     (define-key m "n" 'ggtags-view-search-history-next)
     (define-key m "\M-n" 'ggtags-view-search-history-next)
+    (define-key m "\C-k" 'ggtags-view-search-history-kill)
+    (define-key m [remap yank] (lambda (&optional arg) (interactive "P") (yank arg)))
+    (define-key m "\C-c\C-c" 'ggtags-view-search-history-update)
     (define-key m "r" 'ggtags-save-to-register)
     (define-key m "\r" 'ggtags-view-search-history-action)
     (define-key m "q" 'kill-buffer-and-window)
@@ -1092,6 +1095,41 @@ Global and Emacs."
 (defun ggtags-view-search-history-prev (&optional arg)
   (interactive "p")
   (ggtags-view-search-history-next (- (or arg 1))))
+
+(defun ggtags-view-search-history-kill (&optional append)
+  (interactive "P")
+  (let* ((node (or (ewoc-locate ggtags-global-search-ewoc)
+                   (user-error "No node at point")))
+         (next (ewoc-next ggtags-global-search-ewoc node))
+         (text (filter-buffer-substring (ewoc-location node)
+                                        (if next (ewoc-location next)
+                                          (point-max)))))
+    (put-text-property
+     0 (length text) 'yank-handler
+     (list (lambda (arg)
+             (if (not ggtags-global-search-ewoc)
+                 (insert (car arg))
+               (let* ((inhibit-read-only t)
+                      (node (unless (looking-at-p "[ \t\n]*\\'")
+                              (ewoc-locate ggtags-global-search-ewoc))))
+                 (if node
+                     (ewoc-enter-before ggtags-global-search-ewoc
+                                        node (cadr arg))
+                   (ewoc-enter-last ggtags-global-search-ewoc (cadr arg))))))
+           (list text (ewoc-data node)))
+     text)
+    (if append (kill-append text nil)
+      (kill-new text))
+    (let ((inhibit-read-only t))
+      (ewoc-delete ggtags-global-search-ewoc node))))
+
+(defun ggtags-view-search-history-update (&optional noconfirm)
+  "Update `ggtags-global-search-history' to current buffer."
+  (interactive "P")
+  (when (or noconfirm
+            (yes-or-no-p "Modify `ggtags-global-search-history'?"))
+    (setq ggtags-global-search-history
+          (ewoc-collect ggtags-global-search-ewoc #'identity))))
 
 (defun ggtags-view-search-history-action ()
   (interactive)
