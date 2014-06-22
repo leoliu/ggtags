@@ -294,8 +294,8 @@ Integration with other packages
 NEWS
 ~~~~
 
-[devel] 0.8.5
-+++++++++++++
+[2014-06-22 Sun] 0.8.5
+++++++++++++++++++++++
 
 #. New command ``ggtags-find-tag-mouse`` for mouse support.
 #. New command ``ggtags-find-definition``.

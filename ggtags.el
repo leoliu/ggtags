@@ -1569,7 +1569,7 @@ commands `next-error' and `previous-error'.
             (save-excursion (goto-char pt) (end-of-line) (point))
             'compilation-message)))
         ;; There are multiple matches so pop up the buffer.
-        (ggtags-global--display-buffer)
+        (and ggtags-navigation-mode (ggtags-global--display-buffer))
       ;; For the `compilation-auto-jump' in idle timer to run.
       ;; See also: http://debbugs.gnu.org/13829
       (sit-for 0)
