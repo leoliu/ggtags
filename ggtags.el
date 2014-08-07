@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.5
+;; Version: 0.8.6
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -1897,9 +1897,29 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (set-process-sentinel proc sentinel)
     proc))
 
+(cl-defun ggtags-fontify-code (code &optional (mode major-mode))
+  (cl-check-type mode function)
+  (cl-typecase code
+    ((not string) code)
+    (string (cl-labels ((prepare-buffer ()
+                          (with-current-buffer
+                              (get-buffer-create " *Code-Fontify*")
+                            (delay-mode-hooks (funcall mode))
+                            (setq font-lock-mode t)
+                            (funcall font-lock-function font-lock-mode)
+                            (current-buffer))))
+              (with-current-buffer (prepare-buffer)
+                (let ((inhibit-read-only t))
+                  (erase-buffer)
+                  (insert code)
+                  (font-lock-default-fontify-region
+                   (point-min) (point-max) nil))
+                (buffer-string))))))
+
 (defun ggtags-get-definition-default (defs)
   (and (caar defs)
-       (concat (caar defs) (and (cdr defs) " [guess]"))))
+       (concat (ggtags-fontify-code (caar defs))
+               (and (cdr defs) " [guess]"))))
 
 (defun ggtags-show-definition (name)
   (interactive (list (ggtags-read-tag 'definition current-prefix-arg)))
