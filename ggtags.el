@@ -114,7 +114,7 @@ limit, only files edited in Ggtags mode are updated (via `global
   :group 'ggtags)
 
 (defcustom ggtags-include-pattern
-  '("^\\s-*#\\(?:include\\|import\\)\\s-*[\"<]\\(?:[./]*\\)?\\(.*?\\)[\">]" . 1)
+  '("^\\s-*#\\s-*\\(?:include\\|import\\)\\s-*[\"<]\\(?:[./]*\\)?\\(.*?\\)[\">]" . 1)
   "Pattern used to detect #include files.
 Value can be (REGEXP . SUB) or a function with no arguments.
 REGEXP should match from the beginning of line."
