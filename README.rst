@@ -71,6 +71,7 @@ Global source for further information.
 
    pip install pygments
    git clone https://github.com/yoshizow/global-pygments-plugin.git
+   cd global-pygments-plugin/
    sh reconf.sh
    ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
    make && make install
