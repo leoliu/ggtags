@@ -40,9 +40,9 @@ Features
 Screenshot
 ~~~~~~~~~~
 
-.. figure:: http://i.imgur.com/LX7PVc3.png
+.. figure:: http://i.imgur.com/wx8ZPGe.png
    :width: 500px
-   :target: http://i.imgur.com/LX7PVc3.png
+   :target: http://i.imgur.com/wx8ZPGe.png
    :alt: ggtags.png
 
 Why GNU Global
@@ -56,28 +56,36 @@ Install Global and plugins
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Compile and install Global with ``exuberant-ctags``
-::
+   ::
 
-   ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
-   make && make install
+     ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
+     make && make install
 
-The executable ``ctags`` is unfortunately named because ``emacs`` also
-includes a command of the same name. So make sure it is from
-http://ctags.sourceforge.net. See ``plugin-factory/README`` in GNU
-Global source for further information.
+   The executable ``ctags`` is unfortunately named because ``emacs`` also
+   includes a command of the same name. So make sure it is from
+   http://ctags.sourceforge.net. See ``plugin-factory/README`` in GNU
+   Global source for further information.
 
 2. Install ``pygments`` plugin
-::
 
-   pip install pygments
-   git clone https://github.com/yoshizow/global-pygments-plugin.git
-   cd global-pygments-plugin/
-   sh reconf.sh
-   ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
-   make && make install
-   cp sample.globalrc $HOME/.globalrc
+   The ``pygments`` plugin has been included in ``global`` since
+   version ``6.3.2``. ``pip install pygments`` is the only step
+   required. Note the plugin is not activated by the default
+   ``gtags.conf`` or ``.globalrc``. See
+   ``global/plugin-factory/PLUGIN_HOWTO.pygments`` for details.
 
-Make sure the value of ``<PREFIX>`` agree with step 1.
+   The following instructions are for older ``global``.
+   ::
+
+     pip install pygments
+     git clone https://github.com/yoshizow/global-pygments-plugin.git
+     cd global-pygments-plugin/
+     sh reconf.sh
+     ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
+     make && make install
+     cp sample.globalrc $HOME/.globalrc
+
+   Make sure the value of ``<PREFIX>`` agree with step 1.
 
 Config
 ~~~~~~
@@ -296,8 +304,8 @@ Integration with other packages
 NEWS
 ~~~~
 
-[devel]
-~~~~~~~
+[2014-09-12 Fri] 0.8.6
+++++++++++++++++++++++
 
 #. ``ggtags-show-definition`` shows definition with font locking.
 
