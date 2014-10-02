@@ -194,6 +194,10 @@ turned on to facilitate locating the right match.
 
    Move to previous file.
 
+``M-=``
+
+   Move to the file where navigation session starts
+
 ``M-<``
 
    Move to the first match.
@@ -304,11 +308,15 @@ Integration with other packages
 NEWS
 ~~~~
 
+(devel) 0.8.7
++++++++++++++
+
+#. New navigation command ``ggtags-navigation-start-file``.
+
 [2014-09-12 Fri] 0.8.6
 ++++++++++++++++++++++
 
 #. ``ggtags-show-definition`` shows definition with font locking.
-
 
 [2014-06-22 Sun] 0.8.5
 ++++++++++++++++++++++

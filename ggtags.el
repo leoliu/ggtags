@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.6
+;; Version: 0.8.7
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -827,6 +827,7 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
 ;; Can be three values: nil, t and a marker; t means start marker has
 ;; been saved in the tag ring.
 (defvar ggtags-global-start-marker nil)
+(defvar ggtags-global-start-file nil)
 (defvar ggtags-tag-ring-index nil)
 (defvar ggtags-global-search-history nil)
 
@@ -846,6 +847,8 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
          (env ggtags-process-environment))
     (unless (markerp ggtags-global-start-marker)
       (setq ggtags-global-start-marker (point-marker)))
+    ;; Record the file name for `ggtags-navigation-start-file'.
+    (setq ggtags-global-start-file buffer-file-name)
     (setq ggtags-auto-jump-to-match-target
           (nth 4 (assoc (ggtags-global-search-id command default-directory)
                         ggtags-global-search-history)))
@@ -1001,6 +1004,20 @@ When called interactively with a prefix, ask for the directory."
 
 (defvar ggtags-navigation-mode)
 
+(defun ggtags-foreach-file (fn)
+  "Invoke FN with each file found.
+FN is invoked while *ggtags-global* buffer is current."
+  (ggtags-ensure-global-buffer
+    (save-excursion
+      (goto-char (point-min))
+      (while (with-demoted-errors "compilation-next-error: %S"
+               (compilation-next-error 1 'file)
+               t)
+        (funcall fn (caar
+                     (compilation--loc->file-struct
+                      (compilation--message->loc
+                       (get-text-property (point) 'compilation-message)))))))))
+
 (defun ggtags-query-replace (from to &optional delimited)
   "Query replace FROM with TO on files in the Global buffer.
 If not in navigation mode, do a grep on FROM first.
@@ -1020,13 +1037,8 @@ Global and Emacs."
               (ggtags-with-temp-message "Waiting for Grep to finish..."
                 (while (get-buffer-process (current-buffer))
                   (sit-for 0.2)))
-              (goto-char (point-min))
-              (while (ignore-errors (compilation-next-file 1) t)
-                (let ((m (get-text-property (point) 'compilation-message)))
-                  (push (expand-file-name
-                         (caar (compilation--loc->file-struct
-                                (compilation--message->loc m))))
-                        files))))
+              (ggtags-foreach-file
+               (lambda (file) (push (expand-file-name file) files))))
             (ggtags-navigation-mode -1)
             (nreverse files))))
     (tags-query-replace from to delimited file-form)))
@@ -1627,6 +1639,7 @@ commands `next-error' and `previous-error'.
     (define-key map "\M-p" 'previous-error)
     (define-key map "\M-}" 'ggtags-navigation-next-file)
     (define-key map "\M-{" 'ggtags-navigation-previous-file)
+    (define-key map "\M-=" 'ggtags-navigation-start-file)
     (define-key map "\M->" 'ggtags-navigation-last-error)
     (define-key map "\M-<" 'first-error)
     ;; Note: shadows `isearch-forward-regexp' but it can still be
@@ -1735,6 +1748,20 @@ commands `next-error' and `previous-error'.
 (defun ggtags-navigation-previous-file (n)
   (interactive "p")
   (ggtags-navigation-next-file (- n)))
+
+(defun ggtags-navigation-start-file ()
+  "Move to the file where navigation session starts."
+  (interactive)
+  (let ((start-file (or ggtags-global-start-file
+                        (user-error "Cannot decide start file"))))
+    (ggtags-ensure-global-buffer
+      (pcase (cl-block nil
+               (ggtags-foreach-file
+                (lambda (file)
+                  (when (file-equal-p file start-file)
+                    (cl-return (point))))))
+        (`nil (user-error "No matches for `%s'" start-file))
+        (n (goto-char n) (compile-goto-error))))))
 
 (defun ggtags-navigation-last-error ()
   (interactive)
