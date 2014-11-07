@@ -196,7 +196,7 @@ turned on to facilitate locating the right match.
 
 ``M-=``
 
-   Move to the file where navigation session starts
+   Move to the file where navigation session starts.
 
 ``M-<``
 
