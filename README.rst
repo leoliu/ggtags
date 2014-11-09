@@ -312,6 +312,7 @@ NEWS
 +++++++++++++
 
 #. New navigation command ``ggtags-navigation-start-file``.
+#. New variable ``ggtags-use-sqlite3`` to enable sqlite3 storage.
 
 [2014-09-12 Fri] 0.8.6
 ++++++++++++++++++++++

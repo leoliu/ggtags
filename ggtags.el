@@ -188,6 +188,14 @@ If an integer abbreviate only names longer than that number."
   :type 'boolean
   :group 'ggtags)
 
+(defcustom ggtags-use-sqlite3 nil
+  "Use sqlite3 for storage instead of Berkeley DB.
+This feature requires GNU Global 6.3.3+ and is ignored if `gtags'
+isn't built with sqlite3 support."
+  :type 'boolean
+  :safe 'booleanp
+  :group 'ggtags)
+
 (defcustom ggtags-global-output-format 'grep
   "Global output format: path, ctags, ctags-x, grep or cscope."
   :type '(choice (const path)
@@ -391,6 +399,14 @@ Nil means using the value of `completing-read-function'."
       (expand-file-name name ggtags-executable-directory)
     name))
 
+(defun ggtags-process-succeed-p (program &rest args)
+  "Return non-nil if successfully running PROGRAM with ARGS."
+  (let ((program (ggtags-program-path program)))
+    (condition-case err
+        (zerop (apply #'process-file program nil nil nil args))
+      (error (message "`%s' failed: %s" program (error-message-string err))
+             nil))))
+
 (defun ggtags-process-string (program &rest args)
   (with-temp-buffer
     (let ((exit (apply #'process-file
@@ -431,19 +447,11 @@ Nil means using the value of `completing-read-function'."
                     'has-refs)))
             ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
             (has-path-style
-             (with-demoted-errors "ggtags-make-project: %S"
-               ;; in case `global' not found
-               (and (zerop (process-file (ggtags-program-path "global")
-                                         nil nil nil
-                                         "--path-style" "shorter" "--help"))
-                    'has-path-style)))
+             (and (ggtags-process-succeed-p "global" "--path-style" "shorter" "--help")
+                  'has-path-style))
             ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
-            (has-color
-             (with-demoted-errors "ggtags-make-project: %S"
-               (and (zerop (process-file (ggtags-program-path "global")
-                                         nil nil nil
-                                         "--color" "--help"))
-                    'has-color))))
+            (has-color (and (ggtags-process-succeed-p "global" "--color" "--help")
+                            'has-color)))
        (puthash default-directory
                 (ggtags-project--make :root default-directory
                                       :tag-size tag-size
@@ -676,10 +684,14 @@ source trees. See Info node `(global)gtags' for details."
           (setenv "GTAGSLABEL" "ctags"))
         (ggtags-with-temp-message "`gtags' in progress..."
           (let ((default-directory (file-name-as-directory root))
-                (args (cl-remove-if #'null
-                                    (list (and ggtags-use-idutils "--idutils")
-                                          (and conf "--gtagsconf")
-                                          (and conf (ggtags-ensure-localname conf))))))
+                (args (cl-remove-if
+                       #'null
+                       (list (and ggtags-use-idutils "--idutils")
+                             (and ggtags-use-sqlite3
+                                  (ggtags-process-succeed-p "gtags" "--sqlite3" "--help")
+                                  "--sqlite3")
+                             (and conf "--gtagsconf")
+                             (and conf (ggtags-ensure-localname conf))))))
             (condition-case err
                 (apply #'ggtags-process-string "gtags" args)
               (error (if (and ggtags-use-idutils
