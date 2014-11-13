@@ -308,8 +308,14 @@ Integration with other packages
 NEWS
 ~~~~
 
-(devel) 0.8.7
+(devel) 0.8.8
 +++++++++++++
+
+#. Command ``ggtags-update-tags`` now runs in the background for large
+   projects (per ``ggtags-oversize-limit``) without blocking emacs.
+
+[2014-11-10 Mon] 0.8.7
+++++++++++++++++++++++
 
 #. New navigation command ``ggtags-navigation-start-file``.
 #. New variable ``ggtags-use-sqlite3`` to enable sqlite3 storage.

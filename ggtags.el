@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.7
+;; Version: 0.8.8
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -719,15 +719,26 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
                  (ggtags-check-project)
                  ;; Mark project info expired.
                  (setf (ggtags-project-timestamp (ggtags-find-project)) -1)
-                 (list t)))
-  (when (or force (and (ggtags-find-project)
-                       (not (ggtags-project-oversize-p))
-                       (ggtags-project-dirty-p (ggtags-find-project))))
-    (ggtags-with-current-project
-      (ggtags-with-temp-message "`global -u' in progress..."
-        (ggtags-process-string "global" "-u")
-        (setf (ggtags-project-dirty-p (ggtags-find-project)) nil)
-        (setf (ggtags-project-mtime (ggtags-find-project)) (float-time))))))
+                 (list 'interactive)))
+  (cond ((and (eq force 'interactive) (ggtags-project-oversize-p))
+         (ggtags-with-current-project
+           (with-display-buffer-no-window
+             (with-current-buffer (compilation-start "global -u")
+               (add-hook 'compilation-finish-functions
+                         #'ggtags-update-tags-finish nil t)))))
+        ((or force (and (ggtags-find-project)
+                        (not (ggtags-project-oversize-p))
+                        (ggtags-project-dirty-p (ggtags-find-project))))
+         (ggtags-with-current-project
+           (ggtags-with-temp-message "`global -u' in progress..."
+             (ggtags-process-string "global" "-u")
+             (ggtags-update-tags-finish))))))
+
+(defun ggtags-update-tags-finish (&optional buf how)
+  (if (and how buf (string-prefix-p "exited abnormally" how))
+      (display-buffer buf)
+    (setf (ggtags-project-dirty-p (ggtags-find-project)) nil)
+    (setf (ggtags-project-mtime (ggtags-find-project)) (float-time))))
 
 (defun ggtags-update-tags-single (file &optional nowait)
   ;; NOTE: NOWAIT is ignored if file is remote file; see
