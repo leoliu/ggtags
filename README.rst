@@ -308,6 +308,11 @@ Integration with other packages
 NEWS
 ~~~~
 
+(devel) 0.8.9
++++++++++++++
+
+#. ``ggtags-visit-project-root`` can visit past projects.
+
 [2014-12-03 Wed] 0.8.8
 ++++++++++++++++++++++
 

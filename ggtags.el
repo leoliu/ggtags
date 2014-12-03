@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.8
+;; Version: 0.8.9
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -608,10 +608,15 @@ Value is new modtime if updated."
       (message "Project read-only-mode is %s" (if val "on" "off")))
     val))
 
-(defun ggtags-visit-project-root ()
-  (interactive)
-  (ggtags-ensure-project)
-  (dired (ggtags-current-project-root)))
+(defun ggtags-visit-project-root (&optional project)
+  "Visit the root directory of (current) PROJECT in dired.
+When called with a prefix \\[universal-argument], choose from past projects."
+  (interactive (list (and current-prefix-arg
+                          (completing-read "Project: " ggtags-projects))))
+  (dired (cl-typecase project
+           (string project)
+           (ggtags-project (ggtags-project-root project))
+           (t (ggtags-ensure-project) (ggtags-current-project-root)))))
 
 (defmacro ggtags-with-current-project (&rest body)
   "Eval BODY in current project's `process-environment'."
