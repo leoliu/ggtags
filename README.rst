@@ -308,8 +308,8 @@ Integration with other packages
 NEWS
 ~~~~
 
-(devel) 0.8.8
-+++++++++++++
+[2014-12-03 Wed] 0.8.8
+++++++++++++++++++++++
 
 #. Command ``ggtags-update-tags`` now runs in the background for large
    projects (per ``ggtags-oversize-limit``) without blocking emacs.

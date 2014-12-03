@@ -36,10 +36,10 @@
 ;;
 ;; All commands are available from the `Ggtags' menu in `ggtags-mode'.
 
-;;; NEWS 0.8.7 (2014-11-10):
+;;; NEWS 0.8.8 (2014-12-03):
 
-;; - New navigation command `ggtags-navigation-start-file'.
-;; - New variable `ggtags-use-sqlite3' to enable sqlite3 storage.
+;; - Command `ggtags-update-tags' now runs in the background for large
+;;   projects (per `ggtags-oversize-limit') without blocking emacs.
 ;;
 ;; See full NEWS on https://github.com/leoliu/ggtags#news
 
@@ -717,7 +717,11 @@ source trees. See Info node `(global)gtags' for details."
 
 (defun ggtags-update-tags (&optional force)
   "Update GNU Global tag database.
-Do nothing if GTAGS exceeds the oversize limit unless FORCE."
+Do nothing if GTAGS exceeds the oversize limit unless FORCE.
+
+When called interactively on large (per `ggtags-oversize-limit'
+projects, the update process runs in the background without
+blocking emacs."
   (interactive (progn
                  (ggtags-check-project)
                  ;; Mark project info expired.
@@ -727,6 +731,9 @@ Do nothing if GTAGS exceeds the oversize limit unless FORCE."
          (ggtags-with-current-project
            (with-display-buffer-no-window
              (with-current-buffer (compilation-start "global -u")
+               ;; A hack to fool compilation mode to display `global
+               ;; -u finished' on finish.
+               (setq mode-name "global -u")
                (add-hook 'compilation-finish-functions
                          #'ggtags-update-tags-finish nil t)))))
         ((or force (and (ggtags-find-project)
