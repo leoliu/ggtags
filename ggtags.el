@@ -65,6 +65,9 @@
       (list 'progn (list 'defvar var val docstring)
             (list 'make-variable-buffer-local (list 'quote var)))))
 
+  (or (fboundp 'add-function) (defmacro add-function (&rest _))) ;24.4
+  (or (fboundp 'remove-function) (defmacro remove-function (&rest _)))
+
   (defmacro ignore-errors-unless-debug (&rest body)
     "Ignore all errors while executing BODY unless debug is on."
     (declare (debug t) (indent 0))
@@ -724,7 +727,7 @@ source trees. See Info node `(global)gtags' for details."
   "Update GNU Global tag database.
 Do nothing if GTAGS exceeds the oversize limit unless FORCE.
 
-When called interactively on large (per `ggtags-oversize-limit'
+When called interactively on large (per `ggtags-oversize-limit')
 projects, the update process runs in the background without
 blocking emacs."
   (interactive (progn
@@ -2170,6 +2173,12 @@ to nil disables displaying this information.")
         ;; Append to serve as a fallback method.
         (add-hook 'completion-at-point-functions
                   #'ggtags-completion-at-point t t)
+        ;; Work around http://debbugs.gnu.org/19324
+        (or eldoc-documentation-function
+            (setq-local eldoc-documentation-function #'ignore))
+        (add-function :after-until (local 'eldoc-documentation-function)
+                      #'ggtags-eldoc-function '((name . ggtags-eldoc-function)
+                                                (depth . -100)))
         (unless (memq 'ggtags-mode-line-project-name
                       mode-line-buffer-identification)
           (setq mode-line-buffer-identification
@@ -2177,6 +2186,7 @@ to nil disables displaying this information.")
                         '(ggtags-mode-line-project-name)))))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
     (remove-hook 'completion-at-point-functions #'ggtags-completion-at-point t)
+    (remove-function (local 'eldoc-documentation-function) 'ggtags-eldoc-function)
     (setq mode-line-buffer-identification
           (delq 'ggtags-mode-line-project-name mode-line-buffer-identification))
     (and (overlayp ggtags-highlight-tag-overlay)
