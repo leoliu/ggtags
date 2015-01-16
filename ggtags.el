@@ -1,6 +1,6 @@
 ;;; ggtags.el --- emacs frontend to GNU Global source code tagging system  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013-2014  Free Software Foundation, Inc.
+;; Copyright (C) 2013-2015  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
 ;; Version: 0.8.9
@@ -36,10 +36,10 @@
 ;;
 ;; All commands are available from the `Ggtags' menu in `ggtags-mode'.
 
-;;; NEWS 0.8.8 (2014-12-03):
+;;; NEWS 0.8.9 (2015-01-16):
 
-;; - Command `ggtags-update-tags' now runs in the background for large
-;;   projects (per `ggtags-oversize-limit') without blocking emacs.
+;; - `ggtags-visit-project-root' can visit past projects.
+;; - `eldoc' support enabled for emacs 24.4+.
 ;;
 ;; See full NEWS on https://github.com/leoliu/ggtags#news
 
@@ -549,12 +549,10 @@ Value is new modtime if updated."
 
 (defun ggtags-ensure-project ()
   (or (ggtags-find-project)
-      (when (or (yes-or-no-p "File GTAGS not found; run gtags? ")
-                (user-error "Aborted"))
-        (call-interactively #'ggtags-create-tags)
-        ;; Need checking because `ggtags-create-tags' can create tags
-        ;; in any directory.
-        (ggtags-check-project))))
+      (progn (call-interactively #'ggtags-create-tags)
+             ;; Need checking because `ggtags-create-tags' can create
+             ;; tags in any directory.
+             (ggtags-check-project))))
 
 (defvar delete-trailing-lines)          ;new in 24.3
 

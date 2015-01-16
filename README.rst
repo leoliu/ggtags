@@ -308,8 +308,8 @@ Integration with other packages
 NEWS
 ~~~~
 
-(devel) 0.8.9
-+++++++++++++
+[2015-01-16 Fri] 0.8.9
+++++++++++++++++++++++
 
 #. ``ggtags-visit-project-root`` can visit past projects.
 #. ``eldoc`` support enabled for emacs 24.4+.
