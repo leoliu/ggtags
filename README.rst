@@ -308,6 +308,11 @@ Integration with other packages
 NEWS
 ~~~~
 
+(devel) 0.8.10
+++++++++++++++
+
+#. Tags update on save is configurable by ``ggtags-update-on-save``.
+
 [2015-01-16 Fri] 0.8.9
 ++++++++++++++++++++++
 

@@ -206,6 +206,14 @@ isn't built with sqlite3 support."
   :safe 'booleanp
   :group 'ggtags)
 
+(defcustom ggtags-update-on-save t
+  "Non-nil to update tags for current buffer on saving."
+  ;; It is reported that `global --single-update' can be slow in sshfs
+  ;; directories. See https://github.com/leoliu/ggtags/issues/85.
+  :safe #'booleanp
+  :type 'boolean
+  :group 'ggtags)
+
 (defcustom ggtags-global-output-format 'grep
   "Global output format: path, ctags, ctags-x, grep or cscope."
   :type '(choice (const path)
@@ -1937,7 +1945,7 @@ commands `next-error' and `previous-error'.
 (defun ggtags-after-save-function ()
   (when (ggtags-find-project)
     (ggtags-project-update-mtime-maybe)
-    (and buffer-file-name
+    (and buffer-file-name ggtags-update-on-save
          (ggtags-update-tags-single buffer-file-name 'nowait))))
 
 (defun ggtags-global-output (buffer cmds callback &optional cutoff)
