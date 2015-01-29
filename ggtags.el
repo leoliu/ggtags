@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2015  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.9
+;; Version: 0.8.10
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -2256,7 +2256,13 @@ to nil disables displaying this information.")
                   ;; Prevent multiple runs of ggtags-show-definition
                   ;; for the same tag.
                   (setq ggtags-eldoc-cache (list tag))
-                  (ggtags-show-definition tag)
+                  (condition-case err
+                      (ggtags-show-definition tag)
+                    (file-error
+                     (remove-function (local 'eldoc-documentation-function)
+                                      'ggtags-eldoc-function)
+                     (message "\
+Function `ggtags-eldoc-function' disabled for eldoc in current buffer: %S" err)))
                   nil))))))
 
 ;;; imenu
