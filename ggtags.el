@@ -729,6 +729,16 @@ source trees. See Info node `(global)gtags' for details."
     (message "GTAGS generated in `%s'" root)
     root))
 
+(defun ggtags-explain-tags ()
+  "Explain how each file is indexed in current project."
+  (interactive (ignore (ggtags-check-project)
+                       (or (ggtags-process-succeed-p "gtags" "--explain" "--help")
+                           (user-error "Global 6.4+ required"))))
+  (ggtags-check-project)
+  (ggtags-with-current-project
+    (let ((default-directory (ggtags-current-project-root)))
+      (compilation-start (concat (ggtags-program-path "gtags") " --explain")))))
+
 (defun ggtags-update-tags (&optional force)
   "Update GNU Global tag database.
 Do nothing if GTAGS exceeds the oversize limit unless FORCE.
