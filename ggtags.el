@@ -237,6 +237,12 @@ particularly when the output is large."
   :type 'boolean
   :group 'ggtags)
 
+(defcustom ggtags-global-search-scope nil
+  "Scope to search within."
+  :safe 'stringp
+  :type 'string
+  :group 'ggtags)
+
 (defcustom ggtags-global-treat-text nil
   "Non-nil if Global should include matches from text files.
 This affects `ggtags-find-file' and `ggtags-grep'."
@@ -881,6 +887,7 @@ blocking emacs."
                           (and (ggtags-find-project)
                                (ggtags-project-has-path-style (ggtags-find-project))
                                "--path-style=shorter")
+                          (and ggtags-global-search-scope (concat "--scope=" ggtags-global-search-scope))
                           (and ggtags-global-treat-text "--other")
                           (pcase cmd
                             ((pred stringp) cmd)
