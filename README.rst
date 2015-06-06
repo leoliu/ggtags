@@ -318,6 +318,8 @@ NEWS
 #. Tags update on save is configurable by ``ggtags-update-on-save``.
 #. New command ``ggtags-explain-tags`` to explain how each file is
    indexed in current project. Global 6.4+ required.
+#. New user option ``ggtags-sort-by-nearness`` that sorts matched tags
+   by nearness to current directory.
 
 [2015-01-16 Fri] 0.8.9
 ++++++++++++++++++++++

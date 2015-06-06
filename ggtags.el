@@ -206,6 +206,12 @@ isn't built with sqlite3 support."
   :safe 'booleanp
   :group 'ggtags)
 
+(defcustom ggtags-sort-by-nearness nil
+  "Sort tags by nearness to current directory."
+  :type 'boolean
+  :safe #'booleanp
+  :group 'ggtags)
+
 (defcustom ggtags-update-on-save t
   "Non-nil to update tags for current buffer on saving."
   ;; It is reported that `global --single-update' can be slow in sshfs
@@ -868,6 +874,10 @@ blocking emacs."
                 (default (substring-no-properties default))
                 (t (ggtags-read-tag type t prompt require-match default))))))
 
+(defun ggtags-sort-by-nearness-p ()
+  (and ggtags-sort-by-nearness
+       (ggtags-process-succeed-p "global" "--nearness" "--help")))
+
 (defun ggtags-global-build-command (cmd &rest args)
   ;; CMD can be definition, reference, symbol, grep, idutils
   (let ((xs (append (list (shell-quote-argument (ggtags-program-path "global"))
@@ -878,6 +888,7 @@ blocking emacs."
                                (ggtags-find-project)
                                (ggtags-project-has-color (ggtags-find-project))
                                "--color=always")
+                          (and (ggtags-sort-by-nearness-p) "--nearness")
                           (and (ggtags-find-project)
                                (ggtags-project-has-path-style (ggtags-find-project))
                                "--path-style=shorter")
@@ -939,7 +950,8 @@ blocking emacs."
 
 (defun ggtags-find-tag (cmd &rest args)
   (ggtags-check-project)
-  (ggtags-global-start (apply #'ggtags-global-build-command cmd args)))
+  (ggtags-global-start (apply #'ggtags-global-build-command cmd args)
+                       (and (ggtags-sort-by-nearness-p) default-directory)))
 
 (defun ggtags-include-file ()
   "Calculate the include file based on `ggtags-include-pattern'."
@@ -979,13 +991,16 @@ definition tags."
         (not (ggtags-project-has-refs (ggtags-find-project)))
         (not (ggtags-project-file-p buffer-file-name)))
     (ggtags-find-definition name))
-   (t (ggtags-find-tag (format "--from-here=%d:%s"
-                               (line-number-at-pos)
-                               (shell-quote-argument
-                                ;; Note `ggtags-global-start' binds
-                                ;; default-directory to project root.
-                                (ggtags-project-relative-file buffer-file-name)))
-                       (shell-quote-argument name)))))
+   (t (ggtags-find-tag
+       (format "--from-here=%d:%s"
+               (line-number-at-pos)
+               (shell-quote-argument
+                ;; Note `ggtags-find-tag' may bind `default-directory'
+                ;; to project root.
+                (funcall (if (ggtags-sort-by-nearness-p)
+                             #'file-relative-name #'ggtags-project-relative-file)
+                         buffer-file-name)))
+       (shell-quote-argument name)))))
 
 (defun ggtags-find-tag-mouse (event)
   (interactive "e")
