@@ -36,10 +36,13 @@
 ;;
 ;; All commands are available from the `Ggtags' menu in `ggtags-mode'.
 
-;;; NEWS 0.8.9 (2015-01-16):
+;;; NEWS 0.8.10 (2015-06-12):
 
-;; - `ggtags-visit-project-root' can visit past projects.
-;; - `eldoc' support enabled for emacs 24.4+.
+;; - Tags update on save is configurable by `ggtags-update-on-save'.
+;; - New command `ggtags-explain-tags' to explain how each file is
+;;   indexed in current project.
+;; - New user option `ggtags-sort-by-nearness' that sorts matched tags
+;;   by nearness to current directory.
 ;;
 ;; See full NEWS on https://github.com/leoliu/ggtags#news
 
@@ -207,7 +210,8 @@ isn't built with sqlite3 support."
   :group 'ggtags)
 
 (defcustom ggtags-sort-by-nearness nil
-  "Sort tags by nearness to current directory."
+  "Sort tags by nearness to current directory.
+GNU Global 6.5+ required."
   :type 'boolean
   :safe #'booleanp
   :group 'ggtags)

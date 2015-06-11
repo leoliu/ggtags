@@ -312,8 +312,8 @@ Integration with other packages
 NEWS
 ~~~~
 
-(devel) 0.8.10
-++++++++++++++
+[2015-06-12 Fri] 0.8.10
++++++++++++++++++++++++
 
 #. Tags update on save is configurable by ``ggtags-update-on-save``.
 #. New command ``ggtags-explain-tags`` to explain how each file is
