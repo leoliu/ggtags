@@ -63,8 +63,8 @@ Install Global and plugins
 
    The executable ``ctags`` is unfortunately named because ``emacs`` also
    includes a command of the same name. So make sure it is from
-   http://ctags.sourceforge.net. See ``plugin-factory/README`` in GNU
-   Global source for further information.
+   http://ctags.sourceforge.net. See ``plugin-factory/README`` (``plugin-factory/README``
+   as of GNU Global 6.5) in GNU Global source for further information.
 
 2. Install ``pygments`` plugin
 
