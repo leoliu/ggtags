@@ -61,10 +61,11 @@ Install Global and plugins
      ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
      make && make install
 
-   The executable ``ctags`` is unfortunately named because ``emacs`` also
-   includes a command of the same name. So make sure it is from
-   http://ctags.sourceforge.net. See ``plugin-factory/README`` in GNU
-   Global source for further information.
+   The executable ``ctags`` is unfortunately named because ``emacs``
+   also includes a command of the same name. So make sure it is from
+   http://ctags.sourceforge.net. See ``plugin-factory/PLUGIN_HOWTO``
+   (``plugin-factory/README`` for Global < 6.5) in GNU Global
+   source for further information.
 
 2. Install ``pygments`` plugin
 
