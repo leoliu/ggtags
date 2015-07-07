@@ -647,7 +647,7 @@ When called with a prefix \\[universal-argument], choose from past projects."
                           (ggtags-ensure-localname
                            (directory-file-name (ggtags-current-project-root)))))
             (process-environment
-             (append (let ((process-environment process-environment))
+             (append (let ((process-environment (copy-sequence process-environment)))
                        (and ,gtagsroot (setenv "GTAGSROOT" ,gtagsroot))
                        (mapcar #'substitute-env-vars ggtags-process-environment))
                      process-environment
@@ -703,7 +703,7 @@ If file gtags.files exists in ROOT, it should be a list of source
 files to index, which can be used to speed gtags up in large
 source trees. See Info node `(global)gtags' for details."
   (interactive "DRoot directory: ")
-  (let ((process-environment process-environment))
+  (let ((process-environment (copy-sequence process-environment)))
     (when (zerop (length root)) (error "No root directory provided"))
     (setenv "GTAGSROOT" (ggtags-ensure-localname
                          (expand-file-name
