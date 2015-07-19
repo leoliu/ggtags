@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2015  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.10
+;; Version: 0.8.11
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -1623,19 +1623,23 @@ commands `next-error' and `previous-error'.
                 ggtags-auto-jump-to-match-target))
     (ggtags-forward-to-line ggtags-auto-jump-to-match-target)
     (setq-local ggtags-auto-jump-to-match-target nil)
-    ;;
-    ;; Can't call `compile-goto-error' here becuase
+    (ggtags-delay-finish-functions
+      (with-display-buffer-no-window
+        (condition-case nil
+            (let ((compilation-auto-jump-to-first-error t))
+              (compilation-auto-jump (current-buffer) (point)))
+          (error (message "\
+ggtags: history match invalid, jump to first error instead")
+                 (first-error)))))
     ;; `compilation-filter' restores point and as a result commands
     ;; dependent on point such as `ggtags-navigation-next-file' and
     ;; `ggtags-navigation-previous-file' fail to work.
-    (run-with-idle-timer 0 nil (lambda (buf pt)
-                                 (and (buffer-live-p buf)
-                                      (with-current-buffer buf
-                                        (ggtags-delay-finish-functions
-                                          (let ((compilation-auto-jump-to-first-error t))
-                                            (with-display-buffer-no-window
-                                              (compilation-auto-jump buf pt)))))))
-                         (current-buffer) (point)))
+    (run-with-idle-timer
+     0 nil
+     (lambda (buf pt)
+       (and (buffer-live-p buf)
+            (with-current-buffer buf (goto-char pt))))
+     (current-buffer) (point)))
   (make-local-variable 'ggtags-global-large-output)
   (when (> ggtags-global-output-lines ggtags-global-large-output)
     (cl-incf ggtags-global-large-output 500)
