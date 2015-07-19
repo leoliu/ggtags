@@ -929,7 +929,8 @@ blocking emacs."
   (let* ((default-directory (or directory (ggtags-current-project-root)))
          (split-window-preferred-function ggtags-split-window-function)
          (env ggtags-process-environment))
-    (unless (markerp ggtags-global-start-marker)
+    (unless (and (markerp ggtags-global-start-marker)
+                 (marker-position ggtags-global-start-marker))
       (setq ggtags-global-start-marker (point-marker)))
     ;; Record the file name for `ggtags-navigation-start-file'.
     (setq ggtags-global-start-file buffer-file-name)
