@@ -2027,6 +2027,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                             (delay-mode-hooks (funcall mode))
                             (setq font-lock-mode t)
                             (funcall font-lock-function font-lock-mode)
+                            (setq jit-lock-mode nil)
                             (current-buffer))))
               (with-current-buffer (prepare-buffer)
                 (let ((inhibit-read-only t))
