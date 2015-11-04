@@ -223,7 +223,7 @@ turned on to facilitate locating the right match.
 Miscellaneous commands
 ++++++++++++++++++++++
 
-Commands are avaiable from the ``Ggtags`` menu in ``ggtags-mode``.
+Commands are available from the ``Ggtags`` menu in ``ggtags-mode``.
 
 ggtags-prev-mark
 
@@ -272,7 +272,7 @@ ggtags-explain-tags
 ggtags-browse-file-as-hypertext
 
    Use ``htags`` to generate HTML of the source tree. This allows
-   browsing the porject in a browser with cross-references.
+   browsing the project in a browser with cross-references.
 
 Integration with other packages
 +++++++++++++++++++++++++++++++
