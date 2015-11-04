@@ -4,7 +4,7 @@
 
 This package is part of `GNU ELPA <http://elpa.gnu.org>`_ (``M-x
 list-packages``) and is also available on `MELPA
-<http://melpa.milkbox.net/#/ggtags>`_.
+<https://melpa.org/#/ggtags>`_.
 
 The goal is to make working with GNU Global in Emacs as effortlessly
 and intuitively as possible and to integrate tightly with standard
