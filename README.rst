@@ -313,15 +313,13 @@ Integration with other packages
 NEWS
 ~~~~
 
-(devel) 0.8.11
-++++++++++++++
+[2015-12-15 Tue] 0.8.11
++++++++++++++++++++++++
 
 #. ``ggtags-highlight-tag-delay`` is renamed to
    ``ggtags-highlight-tag``.
 #. Tag highlighting can be disabled by setting
    ``ggtags-highlight-tag`` to nil.
-
-ggtags-highlight-tag
 
 [2015-06-12 Fri] 0.8.10
 +++++++++++++++++++++++
