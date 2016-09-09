@@ -465,32 +465,36 @@ Set to `nil' to disable tag highlighting."
 
 (defun ggtags-make-project (root)
   (cl-check-type root string)
-  (pcase (nthcdr 5 (file-attributes (expand-file-name "GTAGS" root)))
-    (`(,mtime ,_ ,tag-size . ,_)
-     (let* ((default-directory (file-name-as-directory root))
-            (rtags-size (nth 7 (file-attributes "GRTAGS")))
-            (has-refs
-             (when rtags-size
-               (and (or (> rtags-size (* 32 1024))
-                        (with-demoted-errors "ggtags-make-project: %S"
-                          (not (equal "" (ggtags-process-string "global" "-crs")))))
-                    'has-refs)))
-            ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
-            (has-path-style
-             (and (ggtags-process-succeed-p "global" "--path-style" "shorter" "--help")
-                  'has-path-style))
-            ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
-            (has-color (and (ggtags-process-succeed-p "global" "--color" "--help")
-                            'has-color)))
-       (puthash default-directory
-                (ggtags-project--make :root default-directory
-                                      :tag-size tag-size
-                                      :has-refs has-refs
-                                      :has-path-style has-path-style
-                                      :has-color has-color
-                                      :mtime (float-time mtime)
-                                      :timestamp (float-time))
-                ggtags-projects)))))
+  (let* ((default-directory (file-name-as-directory root))
+         ;; NOTE: use of GTAGSDBPATH is not recommended. -- GLOBAL(1)
+         ;; ROOT and DB can be different directories due to GTAGSDBPATH.
+         (dbdir (concat (file-remote-p root)
+                        (ggtags-process-string "global" "-p"))))
+    (pcase (nthcdr 5 (file-attributes (expand-file-name "GTAGS" dbdir)))
+      (`(,mtime ,_ ,tag-size . ,_)
+       (let* ((rtags-size (nth 7 (file-attributes (expand-file-name "GRTAGS" dbdir))))
+              (has-refs
+               (when rtags-size
+                 (and (or (> rtags-size (* 32 1024))
+                          (with-demoted-errors "ggtags-make-project: %S"
+                            (not (equal "" (ggtags-process-string "global" "-crs")))))
+                      'has-refs)))
+              ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
+              (has-path-style
+               (and (ggtags-process-succeed-p "global" "--path-style" "shorter" "--help")
+                    'has-path-style))
+              ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
+              (has-color (and (ggtags-process-succeed-p "global" "--color" "--help")
+                              'has-color)))
+         (puthash default-directory
+                  (ggtags-project--make :root default-directory
+                                        :tag-size tag-size
+                                        :has-refs has-refs
+                                        :has-path-style has-path-style
+                                        :has-color has-color
+                                        :mtime (float-time mtime)
+                                        :timestamp (float-time))
+                  ggtags-projects))))))
 
 (defun ggtags-project-expired-p (project)
   (or (< (ggtags-project-timestamp project) 0)

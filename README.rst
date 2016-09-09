@@ -319,6 +319,8 @@ NEWS
 
 #. ``ggtags-navigation-mode`` is more discreet in displaying lighter
    when ``ggtags-enable-navigation-keys`` is set to nil.
+#. ``ggtags-make-project`` tries harder to find TAG files respecting
+   ``GTAGSDBPATH``.
 
 [2015-12-15 Tue] 0.8.11
 +++++++++++++++++++++++
@@ -385,7 +387,7 @@ NEWS
 [2014-04-12 Sat] 0.8.3
 ++++++++++++++++++++++
 
-#. Tweak mode-line ligter in ``ggtags-navigation-mode``.
+#. Tweak mode-line lighter in ``ggtags-navigation-mode``.
 
 [2014-04-05 Sat] 0.8.2
 ++++++++++++++++++++++
