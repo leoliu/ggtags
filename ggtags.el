@@ -30,9 +30,9 @@
 ;; Usage:
 ;;
 ;; `ggtags' is similar to the standard `etags' package. These keys
-;; `M-.', `M-,', `M-*' and `C-M-.' should work as expected in
-;; `ggtags-mode'. See the README in https://github.com/leoliu/ggtags
-;; for more details.
+;; `M-.', `M-,' and `C-M-.' should work as expected in `ggtags-mode'.
+;; See the README in https://github.com/leoliu/ggtags for more
+;; details.
 ;;
 ;; All commands are available from the `Ggtags' menu in `ggtags-mode'.
 
@@ -91,7 +91,14 @@
   (or (fboundp 'read-only-mode)         ;24.3
       (defalias 'read-only-mode 'toggle-read-only))
   (or (fboundp 'register-read-with-preview) ;24.4
-      (defalias 'register-read-with-preview 'read-char)))
+      (defalias 'register-read-with-preview 'read-char))
+  (or (boundp 'xref--marker-ring)       ;25.1
+      (defvaralias 'xref--marker-ring 'find-tag-marker-ring))
+  (or (fboundp 'xref-push-marker-stack) ;25.1
+      (defun xref-push-marker-stack (&optional m)
+        (ring-insert xref--marker-ring (or m (point-marker)))))
+  (or (fboundp 'xref-pop-marker-stack)
+      (defalias 'xref-pop-marker-stack 'pop-tag-mark)))
 
 (defgroup ggtags nil
   "GNU Global source code tagging system."
@@ -928,7 +935,7 @@ blocking emacs."
 (defun ggtags-global-save-start-marker ()
   (when (markerp ggtags-global-start-marker)
     (setq ggtags-tag-ring-index nil)
-    (ring-insert find-tag-marker-ring ggtags-global-start-marker)
+    (xref-push-marker-stack ggtags-global-start-marker)
     (setq ggtags-global-start-marker t)))
 
 (defun ggtags-global-start (command &optional directory)
@@ -1366,17 +1373,16 @@ Use \\[jump-to-register] to restore the search session."
 (defun ggtags-next-mark (&optional arg)
   "Move to the next (newer) mark in the tag marker ring."
   (interactive)
-  (and (ring-empty-p find-tag-marker-ring) (user-error "Tag ring empty"))
+  (and (ring-empty-p xref--marker-ring) (user-error "Tag ring empty"))
   (setq ggtags-tag-ring-index
         ;; Note `ring-minus1' gets newer item.
         (funcall (if arg #'ring-plus1 #'ring-minus1)
                  (or ggtags-tag-ring-index
-                     (progn
-                       (ring-insert find-tag-marker-ring (point-marker))
-                       0))
-                 (ring-length find-tag-marker-ring)))
-  (let ((m (ring-ref find-tag-marker-ring ggtags-tag-ring-index))
-        (i (- (ring-length find-tag-marker-ring) ggtags-tag-ring-index)))
+                     (progn (xref-push-marker-stack)
+                            0))
+                 (ring-length xref--marker-ring)))
+  (let ((m (ring-ref xref--marker-ring ggtags-tag-ring-index))
+        (i (- (ring-length xref--marker-ring) ggtags-tag-ring-index)))
     (ggtags-echo "%d%s marker%s" i (pcase (mod i 10)
                                      ;; ` required for 24.1 and 24.2
                                      (`1 "st")
@@ -1411,7 +1417,7 @@ commands `next-error' and `previous-error'.
 
 \\{ggtags-view-tag-history-mode-map}"
   (interactive)
-  (and (ring-empty-p find-tag-marker-ring)
+  (and (ring-empty-p xref--marker-ring)
        (user-error "Tag ring empty"))
   (let ((split-window-preferred-function ggtags-split-window-function)
         (inhibit-read-only t))
@@ -1423,8 +1429,8 @@ commands `next-error' and `previous-error'.
     (setq tabulated-list-entries
           ;; Use a function so that revert can work properly.
           (lambda ()
-            (let ((counter (ring-length find-tag-marker-ring))
-                  (elements (or (ring-elements find-tag-marker-ring)
+            (let ((counter (ring-length xref--marker-ring))
+                  (elements (or (ring-elements xref--marker-ring)
                                 (user-error "Tag ring empty")))
                   (action (lambda (_button) (next-error 0)))
                   (get-line (lambda (m)
@@ -1753,7 +1759,8 @@ ggtags: history match invalid, jump to first match instead")
     (define-key map "\M-o" 'ggtags-navigation-visible-mode)
     (define-key map [return] 'ggtags-navigation-mode-done)
     (define-key map "\r" 'ggtags-navigation-mode-done)
-    (define-key map [remap pop-tag-mark] 'ggtags-navigation-mode-abort)
+    (define-key map [remap pop-tag-mark] 'ggtags-navigation-mode-abort) ;Emacs 24
+    (define-key map [remap xref-pop-marker-stack] 'ggtags-navigation-mode-abort)
     map))
 
 (defvar ggtags-mode-map-alist
@@ -1836,7 +1843,7 @@ ggtags: history match invalid, jump to first match instead")
   (when (and ggtags-global-start-marker
              (not (markerp ggtags-global-start-marker)))
     (setq ggtags-global-start-marker nil)
-    (pop-tag-mark)))
+    (xref-pop-marker-stack)))
 
 (defun ggtags-navigation-next-file (n)
   (interactive "p")
@@ -2145,7 +2152,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (define-key menu [view-tag]
       '(menu-item "View tag history" ggtags-view-tag-history))
     (define-key menu [pop-mark]
-      '(menu-item "Pop mark" pop-tag-mark
+      '(menu-item "Pop mark" xref-pop-marker-stack
                   :help "Pop to previous mark and destroy it"))
     (define-key menu [next-mark]
       '(menu-item "Next mark" ggtags-next-mark))
@@ -2177,6 +2184,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
       '(menu-item "Show definition" ggtags-show-definition))
     (define-key menu [find-reference]
       '(menu-item "Find reference" ggtags-find-reference))
+    ;; TODO: bind `find-tag-continue' to `M-*' after dropping support
+    ;; for emacs < 25.
     (define-key menu [find-tag-continue]
       '(menu-item "Continue find tag" tags-loop-continue))
     (define-key menu [find-tag]

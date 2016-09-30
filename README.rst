@@ -115,8 +115,8 @@ directory. The mode line will display the directory name next to the
 buffer name. If point is at a valid definition tag, it is underlined.
 
 ``ggtags`` is similar to the standard ``etags`` package. For example
-these keys ``M-.``, ``M-,``, ``M-*`` and ``C-M-.`` should work as
-expected in ``ggtags-mode``.
+these keys ``M-.``, ``M-,`` and ``C-M-.`` should work as expected in
+``ggtags-mode``.
 
 The following search commands are available:
 
@@ -214,10 +214,10 @@ turned on to facilitate locating the right match.
 
 ``RET``
 
-   Found the right match so exit navigation mode. Resumable by ``M-,``
-   (``tags-loop-continue``).
+   Found the right match so exit navigation mode. Resumable by
+   ``M-x tags-loop-continue``.
 
-``M-*``
+``M-,`` (``M-*`` if Emacs < 25)
 
    Abort and go back to the location where the search was started.
 
@@ -228,8 +228,9 @@ Commands are available from the ``Ggtags`` menu in ``ggtags-mode``.
 
 ggtags-prev-mark
 
-   Move to the previously (older) visited location. Unlike ``M-*``
-   this doesn't delete the location from the tag ring.
+   Move to the previously (older) visited location. Unlike ``M-,``
+   (``M-*`` if Emacs < 25) this doesn't delete the location from the
+   tag ring.
 
 ggtags-next-mark
 
@@ -321,6 +322,7 @@ NEWS
    when ``ggtags-enable-navigation-keys`` is set to nil.
 #. ``ggtags-make-project`` tries harder to find TAG files respecting
    ``GTAGSDBPATH``.
+#. Work with Emacs 25
 
 [2015-12-15 Tue] 0.8.11
 +++++++++++++++++++++++
