@@ -341,7 +341,7 @@ Nil means using the value of `completing-read-function'."
 
 (defcustom ggtags-highlight-tag 0.25
   "If non-nil time in seconds before highlighting tag at point.
-Set to `nil' to disable tag highlighting."
+Set to nil to disable tag highlighting."
   :set (lambda (sym value)
          (when (fboundp 'ggtags-setup-highlight-tag-at-point)
            (ggtags-setup-highlight-tag-at-point value))
