@@ -8,9 +8,8 @@ list-packages``) and is also available on `MELPA
 
 The goal is to make working with GNU Global in Emacs as effortlessly
 and intuitively as possible and to integrate tightly with standard
-emacs packages. ``ggtags.el`` is tested in emacs 24.1, 24.2, 24.3,
-24.4 and trunk. Patches, feature requests and bug reports are welcome.
-Thanks.
+emacs packages. ``ggtags.el`` is tested in Emacs 24 and 25. Patches,
+feature requests and bug reports are welcome. Thanks.
 
 Features
 ~~~~~~~~
@@ -315,15 +314,17 @@ Integration with other packages
 NEWS
 ~~~~
 
-(devel) 0.8.12
-++++++++++++++
+[2016-10-02 Sun] 0.8.12
++++++++++++++++++++++++
 
+#. Work with Emacs 25.
 #. ``ggtags-navigation-mode`` is more discreet in displaying lighter
    when ``ggtags-enable-navigation-keys`` is set to nil.
 #. ``ggtags-make-project`` tries harder to find TAG files respecting
    ``GTAGSDBPATH``.
-#. Work with Emacs 25
-
+#. Fix error "Selecting deleted buffer"
+   (`#89 <https://github.com/leoliu/ggtags/issues/89>`_).
+   
 [2015-12-15 Tue] 0.8.11
 +++++++++++++++++++++++
 

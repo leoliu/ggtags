@@ -36,11 +36,15 @@
 ;;
 ;; All commands are available from the `Ggtags' menu in `ggtags-mode'.
 
-;;; NEWS 0.8.11 (2015-12-15):
+;;; NEWS 0.8.12 (2016-10-02):
 
-;; - `ggtags-highlight-tag-delay' is renamed to `ggtags-highlight-tag'
-;; - Tag highlighting can be disabled by setting
-;;   `ggtags-highlight-tag' to nil.
+;; - Work with Emacs 25
+;; - `ggtags-navigation-mode' is more discreet in displaying lighter
+;;   when `ggtags-enable-navigation-keys' is set to nil
+;; - `ggtags-make-project' tries harder to find TAG files respecting
+;;   `GTAGSDBPATH'
+;; - Fix error "Selecting deleted buffer"
+;;   https://github.com/leoliu/ggtags/issues/89
 ;;
 ;; See full NEWS on https://github.com/leoliu/ggtags#news
 
