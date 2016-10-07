@@ -359,6 +359,11 @@ Set to nil to disable tag highlighting."
   :type 'function
   :group 'ggtags)
 
+(defcustom ggtags-forced-root nil
+  "Directory to be used as global root."
+  :type 'string
+  :group 'ggtags)
+
 ;; Used by ggtags-global-mode
 (defvar ggtags-global-error "match"
   "Stem of message to print when no matches are found.")
@@ -553,11 +558,12 @@ Value is new modtime if updated."
           project)
       (setq ggtags-last-default-directory default-directory)
       (setq ggtags-project-root
-            (or (ignore-errors-unless-debug
-                  (file-name-as-directory
-                   (concat (file-remote-p default-directory)
-                           ;; Resolves symbolic links
-                           (ggtags-process-string "global" "-pr"))))
+            (or ggtags-forced-root
+                (ignore-errors-unless-debug
+                 (file-name-as-directory
+                  (concat (file-remote-p default-directory)
+                          ;; Resolves symbolic links
+                          (ggtags-process-string "global" "-pr"))))
                 ;; 'global -pr' resolves symlinks before checking the
                 ;; GTAGS file which could cause issues such as
                 ;; https://github.com/leoliu/ggtags/issues/22, so
