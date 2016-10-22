@@ -3,7 +3,7 @@
 ;; Copyright (C) 2013-2016  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.12
+;; Version: 0.8.13
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
@@ -553,7 +553,7 @@ Value is new modtime if updated."
           project)
       (setq ggtags-last-default-directory default-directory)
       (setq ggtags-project-root
-            (or (ignore-errors-unless-debug
+            (or (ignore-errors
                   (file-name-as-directory
                    (concat (file-remote-p default-directory)
                            ;; Resolves symbolic links
