@@ -82,6 +82,12 @@
   "Face used to highlight matched line in Global buffer."
   :group 'ggtags)
 
+(defcustom ggtags-executable-suffix nil
+  "Suffix for global executables"
+  :type 'string
+  :group 'ggtags
+  )
+
 (defcustom ggtags-executable-directory nil
   "If non-nil the directory to search global executables."
   :type '(choice (const :tag "Unset" nil) directory)
@@ -452,7 +458,8 @@ Set to nil to disable tag highlighting."
          ;; NOTE: use of GTAGSDBPATH is not recommended. -- GLOBAL(1)
          ;; ROOT and DB can be different directories due to GTAGSDBPATH.
          (dbdir (concat (file-remote-p root)
-                        (ggtags-process-string "global" "-p"))))
+                        (ggtags-process-string
+			 (concat "global" ggtags-executable-suffix) "-p"))))
     (pcase (nthcdr 5 (file-attributes (expand-file-name "GTAGS" dbdir)))
       (`(,mtime ,_ ,tag-size . ,_)
        (let* ((rtags-size (nth 7 (file-attributes (expand-file-name "GRTAGS" dbdir))))
@@ -460,14 +467,17 @@ Set to nil to disable tag highlighting."
                (when rtags-size
                  (and (or (> rtags-size (* 32 1024))
                           (with-demoted-errors "ggtags-make-project: %S"
-                            (not (equal "" (ggtags-process-string "global" "-crs")))))
+                            (not (equal "" (ggtags-process-string
+					    (concat "global" ggtags-executable-suffix) "-crs")))))
                       'has-refs)))
               ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1518
               (has-path-style
-               (and (ggtags-process-succeed-p "global" "--path-style" "shorter" "--help")
+               (and (ggtags-process-succeed-p
+		     (concat "global" ggtags-executable-suffix) "--path-style" "shorter" "--help")
                     'has-path-style))
               ;; http://thread.gmane.org/gmane.comp.gnu.global.bugs/1542
-              (has-color (and (ggtags-process-succeed-p "global" "--color" "--help")
+              (has-color (and (ggtags-process-succeed-p
+			       (concat "global" ggtags-executable-suffix) "--color" "--help")
                               'has-color)))
          (puthash default-directory
                   (ggtags-project--make :root default-directory
@@ -529,7 +539,8 @@ Value is new modtime if updated."
                   (file-name-as-directory
                    (concat (file-remote-p default-directory)
                            ;; Resolves symbolic links
-                           (ggtags-process-string "global" "-pr"))))
+                           (ggtags-process-string
+			    (concat "global" ggtags-executable-suffix) "-pr"))))
                 ;; 'global -pr' resolves symlinks before checking the
                 ;; GTAGS file which could cause issues such as
                 ;; https://github.com/leoliu/ggtags/issues/22, so
@@ -665,7 +676,7 @@ When called with a prefix \\[universal-argument], choose from past projects."
         ;; NOTE: `process-file' requires all files in ARGS be relative
         ;; to `default-directory'; see its doc string for details.
         (let ((default-directory (ggtags-current-project-root)))
-          (process-file (ggtags-program-path "global") nil t nil
+          (process-file (ggtags-program-path (concat "global" ggtags-executable-suffix)) nil t nil
                         "-vP" (concat "^" (ggtags-project-relative-file file) "$"))))
       (goto-char (point-min))
       (not (re-search-forward "^file not found" nil t)))))
@@ -706,19 +717,21 @@ source trees. See Info node `(global)gtags' for details."
                                #'null
                                (list (and ggtags-use-idutils "--idutils")
                                      (and ggtags-use-sqlite3
-                                          (ggtags-process-succeed-p "gtags" "--sqlite3" "--help")
+                                          (ggtags-process-succeed-p
+                                           (concat "gtags" ggtags-executable-suffix)
+                                           "--sqlite3" "--help")
                                           "--sqlite3")
                                      (and conf "--gtagsconf")
                                      (and conf (ggtags-ensure-localname conf))))
                               ggtags-extra-args)))
             (condition-case err
-                (apply #'ggtags-process-string "gtags" args)
+                (apply #'ggtags-process-string (concat "gtags" ggtags-executable-suffix) args)
               (error (if (and ggtags-use-idutils
                               (stringp (cadr err))
                               (string-match-p "mkid not found" (cadr err)))
                          ;; Retry without mkid
                          (apply #'ggtags-process-string
-                                "gtags" (cl-remove "--idutils" args))
+                                (concat "gtags" ggtags-executable-suffix) (cl-remove "--idutils" args))
                        (signal (car err) (cdr err)))))))))
     (ggtags-invalidate-buffer-project-root (file-truename root))
     (message "GTAGS generated in `%s'" root)
@@ -727,12 +740,14 @@ source trees. See Info node `(global)gtags' for details."
 (defun ggtags-explain-tags ()
   "Explain how each file is indexed in current project."
   (interactive (ignore (ggtags-check-project)
-                       (or (ggtags-process-succeed-p "gtags" "--explain" "--help")
+                       (or (ggtags-process-succeed-p
+			    (concat "gtags" ggtags-executable-suffix) "--explain" "--help")
                            (user-error "Global 6.4+ required"))))
   (ggtags-check-project)
   (ggtags-with-current-project
     (let ((default-directory (ggtags-current-project-root)))
-      (compilation-start (concat (ggtags-program-path "gtags") " --explain")))))
+      (compilation-start (concat (ggtags-program-path
+				  (concat "gtags" ggtags-executable-suffix)) " --explain")))))
 
 (defun ggtags-update-tags (&optional force)
   "Update GNU Global tag database.
@@ -749,10 +764,11 @@ blocking emacs."
   (cond ((and (eq force 'interactive) (ggtags-project-oversize-p))
          (ggtags-with-current-project
            (with-display-buffer-no-window
-             (with-current-buffer (compilation-start "global -u")
+	    (with-current-buffer (compilation-start
+				  (concat "global" ggtags-executable-suffix " -u"))
                ;; A hack to fool compilation mode to display `global
                ;; -u finished' on finish.
-               (setq mode-name "global -u")
+               (setq mode-name (concat "global" ggtags-executable-suffix " -u"))
                (add-hook 'compilation-finish-functions
                          #'ggtags-update-tags-finish nil t)))))
         ((or force (and (ggtags-find-project)
@@ -760,7 +776,7 @@ blocking emacs."
                         (ggtags-project-dirty-p (ggtags-find-project))))
          (ggtags-with-current-project
            (ggtags-with-temp-message "`global -u' in progress..."
-             (ggtags-process-string "global" "-u")
+             (ggtags-process-string (concat "global" ggtags-executable-suffix) "-u")
              (ggtags-update-tags-finish))))))
 
 (defun ggtags-update-tags-finish (&optional buf how)
@@ -777,7 +793,8 @@ blocking emacs."
     (ggtags-with-current-project
       ;; See comment in `ggtags-project-file-p'.
       (let ((default-directory (ggtags-current-project-root)))
-        (process-file (ggtags-program-path "global") nil (and nowait 0) nil
+        (process-file (ggtags-program-path
+		       (concat "global" ggtags-executable-suffix)) nil (and nowait 0) nil
                       "--single-update" (ggtags-project-relative-file file))))))
 
 (defun ggtags-delete-tags ()
@@ -826,7 +843,7 @@ blocking emacs."
                        (ggtags-with-current-project
                          (split-string
                           (apply #'ggtags-process-string
-                                 "global"
+                                 (concat "global" ggtags-executable-suffix)
                                  (append (and completion-ignore-case '("--ignore-case"))
                                          ;; Note -c alone returns only definitions
                                          (list (concat "-c" ggtags-completion-flag) prefix)))
@@ -865,13 +882,14 @@ blocking emacs."
 
 (defun ggtags-sort-by-nearness-p (&optional start-location)
   (and ggtags-sort-by-nearness
-       (ggtags-process-succeed-p "global" "--nearness=." "--help")
+       (ggtags-process-succeed-p (concat "global" ggtags-executable-suffix) "--nearness=." "--help")
        (concat "--nearness="
                (or start-location buffer-file-name default-directory))))
 
 (defun ggtags-global-build-command (cmd &rest args)
   ;; CMD can be definition, reference, symbol, grep, idutils
-  (let ((xs (append (list (shell-quote-argument (ggtags-program-path "global"))
+  (let ((xs (append (list (shell-quote-argument (ggtags-program-path
+						 (concat "global" ggtags-executable-suffix)))
                           "-v"
                           (format "--result=%s" ggtags-global-output-format)
                           (and ggtags-global-ignore-case "--ignore-case")
@@ -2064,7 +2082,7 @@ If SYNC is non-nil, synchronously run CMDS and call CALLBACK."
                    (with-current-buffer current
                      (funcall print-fn (funcall get-fn defs)))))))
     (ggtags-with-current-project
-      (ggtags-global-output buffer (cons (ggtags-program-path "global") args)
+      (ggtags-global-output buffer (cons (ggtags-program-path (concat "global" ggtags-executable-suffix)) args)
                             show 100))))
 
 (defvar ggtags-mode-prefix-map
@@ -2333,7 +2351,8 @@ Function `ggtags-eldoc-function' disabled for eldoc in current buffer: %S" err))
     (and file (with-temp-buffer
                 (when (with-demoted-errors "ggtags-build-imenu-index: %S"
                         (zerop (ggtags-with-current-project
-                                 (process-file (ggtags-program-path "global")
+                                 (process-file
+				  (ggtags-program-path (concat "global" ggtags-executable-suffix))
                                                nil t nil "-x" "-f" file))))
                   (goto-char (point-min))
                   (cl-loop while (re-search-forward
