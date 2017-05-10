@@ -454,7 +454,7 @@ Set to nil to disable tag highlighting."
                        (ggtags-program-path program) nil t nil args))
           (output (progn
                     (goto-char (point-max))
-                    (skip-chars-backward " \t\n")
+                    (skip-chars-backward " \t\n\r")
                     (buffer-substring (point-min) (point)))))
       (or (zerop exit)
           (error "`%s' non-zero exit: %s" program output))
