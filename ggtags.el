@@ -1,6 +1,6 @@
 ;;; ggtags.el --- emacs frontend to GNU Global source code tagging system  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013-2016  Free Software Foundation, Inc.
+;; Copyright (C) 2013-2017  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
 ;; Version: 0.8.13
@@ -2053,17 +2053,17 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (string (cl-labels ((prepare-buffer ()
                           (with-current-buffer
                               (get-buffer-create " *Code-Fontify*")
-                            (delay-mode-hooks (funcall mode))
+                            (let ((inhibit-read-only t))
+                              (erase-buffer))
+                            (funcall mode)
                             (setq font-lock-mode t)
                             (funcall font-lock-function font-lock-mode)
                             (setq jit-lock-mode nil)
                             (current-buffer))))
               (with-current-buffer (prepare-buffer)
                 (let ((inhibit-read-only t))
-                  (erase-buffer)
                   (insert code)
-                  (font-lock-default-fontify-region
-                   (point-min) (point-max) nil))
+                  (font-lock-default-fontify-region (point-min) (point-max) nil))
                 (buffer-string))))))
 
 (defun ggtags-get-definition-default (defs)
