@@ -2077,6 +2077,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
   (let* ((re (cadr (assq 'grep ggtags-global-error-regexp-alist-alist)))
          (current (current-buffer))
          (buffer (get-buffer-create " *ggtags-definition*"))
+         (args (list "--result=grep" "--path-style=absolute" name))
          ;; Need these bindings so that let-binding
          ;; `ggtags-print-definition-function' can work see
          ;; `ggtags-eldoc-function'.
@@ -2096,8 +2097,8 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (ggtags-with-current-project
       (ggtags-global-output
        buffer
-       (list (ggtags-program-path "global")
-             "--result=grep" "--path-style=absolute" name)
+       (cons (ggtags-program-path "global")
+             (if (ggtags-sort-by-nearness-p) (cons "--nearness" args) args))
        show 100))))
 
 (defvar ggtags-mode-prefix-map
