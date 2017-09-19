@@ -314,6 +314,13 @@ Integration with other packages
 NEWS
 ~~~~
 
+(devel) 0.8.13
+++++++++++++++
+
+#. Don't choke on tag names start with ``-`` (`#156
+   <https://github.com/leoliu/ggtags/issues/156>`_).
+#. ``ggtags-show-definition`` supports ``ggtags-sort-by-nearness``.
+
 [2016-10-02 Sun] 0.8.12
 +++++++++++++++++++++++
 

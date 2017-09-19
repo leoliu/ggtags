@@ -1022,7 +1022,7 @@ definition tags."
                 (funcall (if (ggtags-sort-by-nearness-p)
                              #'file-relative-name #'ggtags-project-relative-file)
                          buffer-file-name)))
-       (shell-quote-argument name)))))
+       "--" (shell-quote-argument name)))))
 
 (defun ggtags-find-tag-mouse (event)
   (interactive "e")
@@ -1034,7 +1034,7 @@ definition tags."
 ;; Another option for `M-.'.
 (defun ggtags-find-definition (name)
   (interactive (list (ggtags-read-tag 'definition current-prefix-arg)))
-  (ggtags-find-tag 'definition (shell-quote-argument name)))
+  (ggtags-find-tag 'definition "--" (shell-quote-argument name)))
 
 (defun ggtags-setup-libpath-search (type name)
   (pcase (and ggtags-global-search-libpath-for-reference
@@ -1056,13 +1056,13 @@ definition tags."
 (defun ggtags-find-reference (name)
   (interactive (list (ggtags-read-tag 'reference current-prefix-arg)))
   (ggtags-setup-libpath-search 'reference name)
-  (ggtags-find-tag 'reference (shell-quote-argument name)))
+  (ggtags-find-tag 'reference "--" (shell-quote-argument name)))
 
 (defun ggtags-find-other-symbol (name)
   "Find tag NAME that is a reference without a definition."
   (interactive (list (ggtags-read-tag 'symbol current-prefix-arg)))
   (ggtags-setup-libpath-search 'symbol name)
-  (ggtags-find-tag 'symbol (shell-quote-argument name)))
+  (ggtags-find-tag 'symbol "--" (shell-quote-argument name)))
 
 (defun ggtags-quote-pattern (pattern)
   (prin1-to-string (substring-no-properties pattern)))
