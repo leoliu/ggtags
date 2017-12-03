@@ -904,7 +904,7 @@ blocking emacs."
 
 (defun ggtags-sort-by-nearness-p ()
   (and ggtags-sort-by-nearness
-       (ggtags-process-succeed-p "global" "--nearness" "--help")))
+       (ggtags-process-succeed-p "global" "--nearness=." "--help")))
 
 (defun ggtags-global-build-command (cmd &rest args)
   ;; CMD can be definition, reference, symbol, grep, idutils
@@ -916,7 +916,7 @@ blocking emacs."
                                (ggtags-find-project)
                                (ggtags-project-has-color (ggtags-find-project))
                                "--color=always")
-                          (and (ggtags-sort-by-nearness-p) "--nearness")
+                          (and (ggtags-sort-by-nearness-p) "--nearness=.")
                           (and (ggtags-find-project)
                                (ggtags-project-has-path-style (ggtags-find-project))
                                "--path-style=shorter")
@@ -979,8 +979,7 @@ blocking emacs."
 
 (defun ggtags-find-tag (cmd &rest args)
   (ggtags-check-project)
-  (ggtags-global-start (apply #'ggtags-global-build-command cmd args)
-                       (and (ggtags-sort-by-nearness-p) default-directory)))
+  (ggtags-global-start (apply #'ggtags-global-build-command cmd args)))
 
 (defun ggtags-include-file ()
   "Calculate the include file based on `ggtags-include-pattern'."
@@ -1023,12 +1022,10 @@ definition tags."
    (t (ggtags-find-tag
        (format "--from-here=%d:%s"
                (line-number-at-pos)
+               ;; Note `ggtags-find-tag' binds `default-directory' to
+               ;; project root.
                (shell-quote-argument
-                ;; Note `ggtags-find-tag' may bind `default-directory'
-                ;; to project root.
-                (funcall (if (ggtags-sort-by-nearness-p)
-                             #'file-relative-name #'ggtags-project-relative-file)
-                         buffer-file-name)))
+                (ggtags-project-relative-file buffer-file-name)))
        "--" (shell-quote-argument name)))))
 
 (defun ggtags-find-tag-mouse (event)
@@ -2105,7 +2102,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
       (ggtags-global-output
        buffer
        (cons (ggtags-program-path "global")
-             (if (ggtags-sort-by-nearness-p) (cons "--nearness" args) args))
+             (if (ggtags-sort-by-nearness-p) (cons "--nearness=." args) args))
        show 100))))
 
 (defvar ggtags-mode-prefix-map

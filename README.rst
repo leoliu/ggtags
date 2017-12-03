@@ -321,6 +321,7 @@ NEWS
    <https://github.com/leoliu/ggtags/issues/156>`_).
 #. ``ggtags-show-definition`` supports ``ggtags-sort-by-nearness``.
 #. New variable ``ggtags-extra-args``.
+#. Unbreak ``ggtags-sort-by-nearness``.
 
 [2016-10-02 Sun] 0.8.12
 +++++++++++++++++++++++
