@@ -2008,23 +2008,13 @@ When finished invoke CALLBACK in BUFFER with process exit status."
 
 (cl-defun ggtags-fontify-code (code &optional (mode major-mode))
   (cl-check-type mode function)
-  (cl-typecase code
-    ((not string) code)
-    (string (cl-labels ((prepare-buffer ()
-                          (with-current-buffer
-                              (get-buffer-create " *Code-Fontify*")
-                            (let ((inhibit-read-only t))
-                              (erase-buffer))
-                            (funcall mode)
-                            (setq font-lock-mode t)
-                            (funcall font-lock-function font-lock-mode)
-                            (setq jit-lock-mode nil)
-                            (current-buffer))))
-              (with-current-buffer (prepare-buffer)
-                (let ((inhibit-read-only t))
-                  (insert code)
-                  (font-lock-default-fontify-region (point-min) (point-max) nil))
-                (buffer-string))))))
+  (if (stringp code)
+      (with-temp-buffer
+        (insert code)
+        (funcall mode)
+        (font-lock-ensure)
+        (buffer-string))
+    code))
 
 (defun ggtags-get-definition-default (defs)
   (and (caar defs)
