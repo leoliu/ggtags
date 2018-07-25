@@ -1,6 +1,6 @@
 ;;; ggtags.el --- emacs frontend to GNU Global source code tagging system  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013-2017  Free Software Foundation, Inc.
+;; Copyright (C) 2013-2018  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
 ;; Version: 0.8.13
@@ -36,15 +36,12 @@
 ;;
 ;; All commands are available from the `Ggtags' menu in `ggtags-mode'.
 
-;;; NEWS 0.8.12 (2016-10-02):
+;;; NEWS 0.8.13 (2018-07-25):
 
-;; - Work with Emacs 25
-;; - `ggtags-navigation-mode' is more discreet in displaying lighter
-;;   when `ggtags-enable-navigation-keys' is set to nil
-;; - `ggtags-make-project' tries harder to find TAG files respecting
-;;   `GTAGSDBPATH'
-;; - Fix error "Selecting deleted buffer"
-;;   https://github.com/leoliu/ggtags/issues/89
+;; - Don't choke on tag names start with `-'.
+;; - `ggtags-show-definition' supports `ggtags-sort-by-nearness'.
+;; - New variable `ggtags-extra-args'.
+;; - Unbreak `ggtags-sort-by-nearness'.
 ;;
 ;; See full NEWS on https://github.com/leoliu/ggtags#news
 

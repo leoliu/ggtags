@@ -314,8 +314,8 @@ Integration with other packages
 NEWS
 ~~~~
 
-(devel) 0.8.13
-++++++++++++++
+[2018-07-25 Wed] 0.8.13
++++++++++++++++++++++++
 
 #. Don't choke on tag names start with ``-`` (`#156
    <https://github.com/leoliu/ggtags/issues/156>`_).
