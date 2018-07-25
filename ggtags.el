@@ -3,11 +3,11 @@
 ;; Copyright (C) 2013-2018  Free Software Foundation, Inc.
 
 ;; Author: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.8.13
+;; Version: 0.9.0
 ;; Keywords: tools, convenience
 ;; Created: 2013-01-29
 ;; URL: https://github.com/leoliu/ggtags
-;; Package-Requires: ((emacs "24") (cl-lib "0.5"))
+;; Package-Requires: ((emacs "25"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -54,22 +54,8 @@
 (require 'ewoc)
 (require 'compile)
 (require 'etags)
-(require 'tabulated-list)               ;preloaded since 24.3
 
 (eval-when-compile
-  (unless (fboundp 'setq-local)
-    (defmacro setq-local (var val)
-      (list 'set (list 'make-local-variable (list 'quote var)) val)))
-
-  (unless (fboundp 'defvar-local)
-    (defmacro defvar-local (var val &optional docstring)
-      (declare (debug defvar) (doc-string 3))
-      (list 'progn (list 'defvar var val docstring)
-            (list 'make-variable-buffer-local (list 'quote var)))))
-
-  (or (fboundp 'add-function) (defmacro add-function (&rest _))) ;24.4
-  (or (fboundp 'remove-function) (defmacro remove-function (&rest _)))
-
   (defmacro ignore-errors-unless-debug (&rest body)
     "Ignore all errors while executing BODY unless debug is on."
     (declare (debug t) (indent 0))
@@ -79,27 +65,10 @@
     (declare (debug t) (indent 0))
     ;; See http://debbugs.gnu.org/13594
     `(let ((display-buffer-overriding-action
-            (if (and ggtags-auto-jump-to-match
-                     ;; Appeared in emacs 24.4.
-                     (fboundp 'display-buffer-no-window))
+            (if ggtags-auto-jump-to-match
                 (list #'display-buffer-no-window)
               display-buffer-overriding-action)))
        ,@body)))
-
-(eval-and-compile
-  (or (fboundp 'user-error)             ;24.3
-      (defalias 'user-error 'error))
-  (or (fboundp 'read-only-mode)         ;24.3
-      (defalias 'read-only-mode 'toggle-read-only))
-  (or (fboundp 'register-read-with-preview) ;24.4
-      (defalias 'register-read-with-preview 'read-char))
-  (or (boundp 'xref--marker-ring)       ;25.1
-      (defvaralias 'xref--marker-ring 'find-tag-marker-ring))
-  (or (fboundp 'xref-push-marker-stack) ;25.1
-      (defun xref-push-marker-stack (&optional m)
-        (ring-insert xref--marker-ring (or m (point-marker)))))
-  (or (fboundp 'xref-pop-marker-stack)
-      (defalias 'xref-pop-marker-stack 'pop-tag-mark)))
 
 (defgroup ggtags nil
   "GNU Global source code tagging system."
@@ -565,14 +534,12 @@ Value is new modtime if updated."
                 ;; GTAGS file which could cause issues such as
                 ;; https://github.com/leoliu/ggtags/issues/22, so
                 ;; let's help it out.
-                ;;
-                ;; Note: `locate-dominating-file' doesn't accept
-                ;; function for NAME before 24.3.
-                (let ((dir (locate-dominating-file default-directory "GTAGS")))
+                (let ((dir (locate-dominating-file
+                            default-directory
+                            (lambda (dir) (file-regular-p (expand-file-name "GTAGS" dir))))))
                   ;; `file-truename' may strip the trailing '/' on
                   ;; remote hosts, see http://debbugs.gnu.org/16851
-                  (and dir (file-regular-p (expand-file-name "GTAGS" dir))
-                       (file-name-as-directory (file-truename dir))))))
+                  (and dir (file-name-as-directory (file-truename dir))))))
       (when ggtags-project-root
         (if (gethash ggtags-project-root ggtags-projects)
             (ggtags-find-project)
@@ -591,8 +558,6 @@ Value is new modtime if updated."
              ;; Need checking because `ggtags-create-tags' can create
              ;; tags in any directory.
              (ggtags-check-project))))
-
-(defvar delete-trailing-lines)          ;new in 24.3
 
 (defun ggtags-save-project-settings (&optional noconfirm)
   "Save Gnu Global's specific environment variables."
@@ -624,11 +589,10 @@ Value is new modtime if updated."
         (while (pcase (read-char-choice
                        (format "Save `%s'? (y/n/=/?) " buffer-file-name)
                        '(?y ?n ?= ??))
-                 ;; ` required for 24.1 and 24.2
-                 (`?n (user-error "Aborted"))
-                 (`?y nil)
-                 (`?= (diff-buffer-with-file) 'loop)
-                 (`?? (help-form-show) 'loop))))
+                 (?n (user-error "Aborted"))
+                 (?y nil)
+                 (?= (diff-buffer-with-file) 'loop)
+                 (?? (help-form-show) 'loop))))
     (save-buffer)
     (kill-buffer)))
 
@@ -1389,10 +1353,9 @@ Use \\[jump-to-register] to restore the search session."
   (let ((m (ring-ref xref--marker-ring ggtags-tag-ring-index))
         (i (- (ring-length xref--marker-ring) ggtags-tag-ring-index)))
     (ggtags-echo "%d%s marker%s" i (pcase (mod i 10)
-                                     ;; ` required for 24.1 and 24.2
-                                     (`1 "st")
-                                     (`2 "nd")
-                                     (`3 "rd")
+                                     (1 "st")
+                                     (2 "nd")
+                                     (3 "rd")
                                      (_ "th"))
                  (if (marker-buffer m) "" " (dead)"))
     (if (not (marker-buffer m))
@@ -1529,12 +1492,11 @@ commands `next-error' and `previous-error'.
              (format "found %d %s" count
                      (funcall (if (= count 1) #'car #'cadr)
                               (pcase db
-                                ;; ` required for 24.1 and 24.2
-                                (`"GTAGS"  '("definition" "definitions"))
-                                (`"GSYMS"  '("symbol"     "symbols"))
-                                (`"GRTAGS" '("reference"  "references"))
-                                (`"GPATH"  '("file"       "files"))
-                                (`"ID"     '("identifier" "identifiers"))
+                                ("GTAGS"  '("definition" "definitions"))
+                                ("GSYMS"  '("symbol"     "symbols"))
+                                ("GRTAGS" '("reference"  "references"))
+                                ("GPATH"  '("file"       "files"))
+                                ("ID"     '("identifier" "identifiers"))
                                 (_         '("match"      "matches"))))))
            exit-status))))
 
@@ -1711,8 +1673,6 @@ ggtags: history match invalid, jump to first match instead")
      (2 'compilation-error nil t))
     ("^Global found \\([0-9]+\\)" (1 compilation-info-face))))
 
-(defvar compilation-always-kill)        ;new in 24.3
-
 (define-compilation-mode ggtags-global-mode "Global"
   "A mode for showing outputs from gnu global."
   ;; Note: Place `ggtags-global-output-format' as first element for
@@ -1771,7 +1731,6 @@ ggtags: history match invalid, jump to first match instead")
     (define-key map "\M-o" 'ggtags-navigation-visible-mode)
     (define-key map [return] 'ggtags-navigation-mode-done)
     (define-key map "\r" 'ggtags-navigation-mode-done)
-    (define-key map [remap pop-tag-mark] 'ggtags-navigation-mode-abort) ;Emacs 24
     (define-key map [remap xref-pop-marker-stack] 'ggtags-navigation-mode-abort)
     map))
 

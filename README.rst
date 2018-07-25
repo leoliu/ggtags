@@ -314,6 +314,11 @@ Integration with other packages
 NEWS
 ~~~~
 
+(devel)
++++++++
+
+#. Drop support for Emacs < 25.
+
 [2018-07-25 Wed] 0.8.13
 +++++++++++++++++++++++
 
