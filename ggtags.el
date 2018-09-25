@@ -375,6 +375,10 @@ Set to nil to disable tag highlighting."
                                 'compilation-finish-functions ,exit-args))))))
 
 (defmacro ggtags-ensure-global-buffer (&rest body)
+  "Run BODY with `ggtags-global-last-buffer'.
+
+Also ensures `ggtags-global-last-buffer' was properly initialized (see
+`ggtags-global-start').  Errors out otherwise."
   (declare (debug t) (indent 0))
   `(progn
      (or (and (buffer-live-p ggtags-global-last-buffer)
@@ -911,6 +915,10 @@ blocking Emacs."
     (setq ggtags-global-start-marker t)))
 
 (defun ggtags-global-start (command &optional directory)
+  "Run global COMMAND as compilation.
+If DIRECTORY is null, use `ggtags-current-project-root'.
+
+Before running COMMAND setups `ggtags-navigation-mode' and updates tags database."
   (let* ((default-directory (or directory (ggtags-current-project-root)))
          (split-window-preferred-function ggtags-split-window-function)
          (env ggtags-process-environment))
@@ -925,10 +933,10 @@ blocking Emacs."
     (ggtags-navigation-mode +1)
     (ggtags-update-tags)
     (ggtags-with-current-project
-      (with-current-buffer (with-display-buffer-no-window
-                             (compilation-start command 'ggtags-global-mode))
-        (setq-local ggtags-process-environment env)
-        (setq ggtags-global-last-buffer (current-buffer))))))
+     (with-current-buffer (with-display-buffer-no-window
+                           (compilation-start command 'ggtags-global-mode))
+       (setq-local ggtags-process-environment env)
+       (setq ggtags-global-last-buffer (current-buffer))))))
 
 (defun ggtags-find-tag-continue ()
   (interactive)
@@ -1922,7 +1930,10 @@ ggtags: history match invalid, jump to first match instead")
     "]")
   "Ligher for `ggtags-navigation-mode'; set to nil to disable it.")
 
-(define-minor-mode ggtags-navigation-mode nil
+(define-minor-mode ggtags-navigation-mode
+  "Keep track of navigation using ggtags API."
+  :init-value nil
+  :require 'ggtags
   ;; If `ggtags-enable-navigation-keys' is set to nil only display the
   ;; lighter in `ggtags-mode' buffers.
   ;; See https://github.com/leoliu/ggtags/issues/124
@@ -1943,7 +1954,7 @@ ggtags: history match invalid, jump to first match instead")
     (remove-hook 'minibuffer-setup-hook 'ggtags-minibuffer-setup-function)))
 
 (defun ggtags-minibuffer-setup-function ()
-  ;; Disable ggtags-navigation-mode in minibuffer.
+  "Disable ggtags-navigation-mode in minibuffer."
   (setq-local ggtags-enable-navigation-keys nil))
 
 (defun ggtags-kill-file-buffers (&optional interactive)
