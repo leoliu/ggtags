@@ -2258,6 +2258,7 @@ to nil disables displaying this information.")
   (if ggtags-mode
       (progn
         (add-hook 'after-save-hook 'ggtags-after-save-function nil t)
+        (add-hook 'xref-backend-functions 'ggtags--xref-backend nil t)
         ;; Append to serve as a fallback method.
         (add-hook 'completion-at-point-functions
                   #'ggtags-completion-at-point t t)
@@ -2273,6 +2274,7 @@ to nil disables displaying this information.")
                 (append mode-line-buffer-identification
                         '(ggtags-mode-line-project-name)))))
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
+    (remove-hook 'xref-backend-functions 'ggtags--xref-backend t)
     (remove-hook 'completion-at-point-functions #'ggtags-completion-at-point t)
     (remove-function (local 'eldoc-documentation-function) 'ggtags-eldoc-function)
     (setq mode-line-buffer-identification
@@ -2414,6 +2416,98 @@ Function `ggtags-eldoc-function' disabled for eldoc in current buffer: %S" err))
     (he-substitute-string (car he-expand-list))
     (setq he-expand-list (cdr he-expand-list))
     t))
+
+;;; Xref
+
+(defconst ggtags--xref-limit 1000)
+
+(defclass ggtags-xref-location (xref-file-location)
+  ((project-root :type string :initarg :project-root)))
+
+(cl-defmethod xref-location-group ((l ggtags-xref-location))
+  (with-slots (file project-root) l
+    (file-relative-name file project-root)))
+
+(defun ggtags--xref-backend ()
+  (and (ggtags-find-project)
+       (let ((tag (ggtags-tag-at-point)))
+         ;; Try to use this backend if there is no tag at
+         ;; point, since we may still want to when asking
+         ;; the user for a tag.
+         (or (null tag)
+             (test-completion tag ggtags-completion-table)))
+       'ggtags))
+
+(cl-defmethod xref-backend-identifier-at-point ((_backend (eql ggtags)))
+  (ggtags-tag-at-point))
+
+(cl-defmethod xref-backend-identifier-completion-table ((_backend (eql ggtags)))
+  ggtags-completion-table)
+
+(defun ggtags--xref-collect-tags (symbol root colored)
+  "Collect xrefs for SYMBOL from Global output in the `current-buffer'.
+Return the list of xrefs for SYMBOL. Global output is assumed to
+have grep format.
+
+ROOT is the project root directory to associate with the xrefs.
+
+If COLORED is non-nil, convert ANSI color codes to font lock text
+properties in the summary text of each xref."
+  (cl-loop
+   with re = (cadr (assq 'grep ggtags-global-error-regexp-alist-alist))
+   while (re-search-forward re nil t)
+   for summary = (buffer-substring (1+ (match-end 2)) (line-end-position))
+   for file = (expand-file-name (match-string 1))
+   for line = (string-to-number (match-string 2))
+   for column = (string-match-p symbol summary)
+   if colored do (setq summary (ansi-color-apply summary)) end
+   ;; Sometimes there are false positives, depending on the
+   ;; parser used so only collect lines that actually
+   ;; contain SYMBOL.
+   and when column
+   collect (xref-make
+            summary
+            (make-instance
+             'ggtags-xref-location
+             :file file
+             :line line
+             :column column
+             :project-root root))))
+
+(defun ggtags--xref-find-tags (symbol cmd)
+  "Find xrefs of SYMBOL using Global CMD.
+CMD has the same meaning as in `ggtags-global-build-command'.
+Return the list of xrefs for SYMBOL."
+  (let* ((ggtags-global-output-format 'grep)
+         (default-directory default-directory)
+         (project (ggtags-find-project))
+         (xrefs nil)
+         (collect
+          (lambda (_status)
+            (goto-char (point-min))
+            (setq xrefs (ggtags--xref-collect-tags
+                         symbol
+                         (ggtags-project-root project)
+                         (and ggtags-global-use-color
+                              (ggtags-project-has-color project))))
+            (kill-buffer (current-buffer)))))
+    (ggtags-with-current-project
+      (ggtags-global-output
+       (get-buffer-create " *ggtags-xref*")
+       (append
+        (split-string (ggtags-global-build-command cmd))
+        (list "--" (shell-quote-argument symbol)))
+       collect ggtags--xref-limit 'sync)
+      xrefs)))
+
+(cl-defmethod xref-backend-definitions ((_backend (eql ggtags)) symbol)
+  (ggtags--xref-find-tags symbol 'definition))
+
+(cl-defmethod xref-backend-references ((_backend (eql ggtags)) symbol)
+  (ggtags--xref-find-tags symbol 'reference))
+
+(cl-defmethod xref-backend-apropos ((_backend (eql ggtags)) symbol)
+  (ggtags--xref-find-tags symbol 'grep))
 
 (defun ggtags-reload (&optional force)
   (interactive "P")
