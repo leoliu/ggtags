@@ -2037,11 +2037,15 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                         (with-current-buffer (process-buffer proc)
                           (goto-char (process-mark proc))
                           (insert string)
-                          (set-marker (process-mark proc) (point))
-                          (when (and cutoff
-                                     (> (line-number-at-pos (point-max)) cutoff)
-                                     (process-live-p proc))
-                            (interrupt-process (current-buffer)))))))
+                          (when cutoff
+                            (save-restriction
+                              (narrow-to-region (process-mark proc) (point))
+                              (cl-incf (process-get proc :nlines)
+                                       (line-number-at-pos (1- (point)))))
+                            (when (and (> (process-get proc :nlines) cutoff)
+                                       (process-live-p proc))
+                              (interrupt-process (current-buffer))))
+                          (set-marker (process-mark proc) (point))))))
          (sentinel (lambda (proc _msg)
                      (when (memq (process-status proc) '(exit signal))
                        (with-current-buffer (process-buffer proc)
@@ -2050,6 +2054,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
     (set-process-query-on-exit-flag proc nil)
     (and cutoff (set-process-filter proc filter))
     (set-process-sentinel proc sentinel)
+    (process-put proc :nlines 0)
     proc))
 
 (cl-defun ggtags-fontify-code (code &optional (mode major-mode))
