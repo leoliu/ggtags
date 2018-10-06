@@ -2015,9 +2015,10 @@ ggtags: history match invalid, jump to first match instead")
     (and buffer-file-name ggtags-update-on-save
          (ggtags-update-tags-single buffer-file-name 'nowait))))
 
-(defun ggtags-global-output (buffer cmds callback &optional cutoff)
+(defun ggtags-global-output (buffer cmds callback &optional cutoff sync)
   "Asynchronously pipe the output of running CMDS to BUFFER.
-When finished invoke CALLBACK in BUFFER with process exit status."
+When finished invoke CALLBACK in BUFFER with process exit status.
+If SYNC is non-nil, synchronously run CMDS and call CALLBACK."
   (or buffer (error "Output buffer required"))
   (when (get-buffer-process (get-buffer buffer))
     ;; Notice running multiple processes in the same buffer so that we
@@ -2044,11 +2045,16 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                      (when (memq (process-status proc) '(exit signal))
                        (with-current-buffer (process-buffer proc)
                          (set-process-buffer proc nil)
-                         (funcall callback (process-exit-status proc)))))))
+                         (unwind-protect
+                             (funcall callback (process-exit-status proc))
+                           (process-put proc :callback-done t)))))))
     (set-process-query-on-exit-flag proc nil)
     (and cutoff (set-process-filter proc filter))
     (set-process-sentinel proc sentinel)
-    proc))
+    (process-put proc :callback-done nil)
+    (if sync (while (not (process-get proc :callback-done))
+               (accept-process-output proc 1))
+      proc)))
 
 (cl-defun ggtags-fontify-code (code &optional (mode major-mode))
   (cl-check-type mode function)
