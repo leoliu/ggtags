@@ -1993,6 +1993,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                         (with-current-buffer (process-buffer proc)
                           (goto-char (process-mark proc))
                           (insert string)
+                          (set-marker (process-mark proc) (point))
                           (when (and (> (line-number-at-pos (point-max)) cutoff)
                                      (process-live-p proc))
                             (interrupt-process (current-buffer)))))))
