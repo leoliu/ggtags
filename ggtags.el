@@ -2037,7 +2037,7 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                         (with-current-buffer (process-buffer proc)
                           (goto-char (process-mark proc))
                           (insert string)
-                          (when (and (> (line-number-at-pos (point-max)) cutoff)
+                          (when (and cutoff (> (line-number-at-pos (point-max)) cutoff)
                                      (process-live-p proc))
                             (interrupt-process (current-buffer)))))))
          (sentinel (lambda (proc _msg)
