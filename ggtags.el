@@ -1994,10 +1994,8 @@ If SYNC is non-nil, synchronously run CMDS and call CALLBACK."
                         (with-current-buffer (process-buffer proc)
                           (goto-char (process-mark proc))
                           (insert string)
-                          (save-restriction
-                            (narrow-to-region (process-mark proc) (point))
-                            (cl-incf (process-get proc :nlines)
-                                     (line-number-at-pos (1- (point)))))
+                          (cl-incf (process-get proc :nlines)
+                                   (count-lines (process-mark proc) (point)))
                           (set-marker (process-mark proc) (point))
                           (when (and (> (line-number-at-pos (point-max)) cutoff)
                                      (process-live-p proc))
