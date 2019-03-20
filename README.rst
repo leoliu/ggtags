@@ -318,6 +318,8 @@ NEWS
 +++++++
 
 #. Drop support for Emacs < 25.
+#. Integration with ``xref.el``.
+#. Make ``ggtags-sort-by-nearness`` actually work.
 
 [2018-07-25 Wed] 0.8.13
 +++++++++++++++++++++++
