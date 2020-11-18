@@ -29,7 +29,7 @@ Features
 #. Highlight (definition) tag at point.
 #. Abbreviated display of file names.
 #. Support all Global search backends: ``grep``, ``idutils`` etc.
-#. Support `exuberant ctags <http://ctags.sourceforge.net/>`_ and
+#. Support `exuberant/universal ctags <https://ctags.io/>`_ and
    ``pygments`` backend.
 #. Support all Global's output formats: ``grep``, ``ctags-x``,
    ``cscope`` etc.
@@ -55,15 +55,15 @@ between a few tools.
 Install Global and plugins
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Compile and install Global with ``exuberant-ctags``
+1. Compile and install Global with ``universal-ctags``
    ::
 
-     ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
+     ./configure --prefix=<PREFIX> --with-universal-ctags=/usr/local/bin/ctags
      make && make install
 
    The executable ``ctags`` is unfortunately named because ``emacs``
    also includes a command of the same name. So make sure it is from
-   http://ctags.sourceforge.net. See ``plugin-factory/PLUGIN_HOWTO``
+   https://ctags.io. See ``plugin-factory/PLUGIN_HOWTO``
    (``plugin-factory/README`` for Global < 6.5) in GNU Global
    source for further information.
 
@@ -82,7 +82,7 @@ Install Global and plugins
      git clone https://github.com/yoshizow/global-pygments-plugin.git
      cd global-pygments-plugin/
      sh reconf.sh
-     ./configure --prefix=<PREFIX> --with-exuberant-ctags=/usr/local/bin/ctags
+     ./configure --prefix=<PREFIX> --with-universal-ctags=/usr/local/bin/ctags
      make && make install
      cp sample.globalrc $HOME/.globalrc
 
@@ -91,7 +91,7 @@ Install Global and plugins
 Config
 ~~~~~~
 
-Global with ``exuberant-ctags`` and ``pygments`` plugins can support
+Global with ``universal-ctags`` and ``pygments`` plugins can support
 dozens of programming languages. For example, to enable
 ``ggtags-mode`` for C/C++/Java modes::
 
