@@ -698,8 +698,11 @@ source trees. See Info node `(global)gtags' for details."
                                 for full = (expand-file-name name root)
                                 thereis (and (file-exists-p full) full)))))
         (unless (or conf (getenv "GTAGSLABEL")
-                    (not (yes-or-no-p "Use `ctags' backend? ")))
-          (setenv "GTAGSLABEL" "ctags"))
+                   (setenv "GTAGSLABEL"
+			    (ido-completing-read
+			     "Which backend? "
+			     '(("native" 1) ("ctags" 2) ("pygments" 3) ("new-ctags" 4))
+			     nil t))))
         (ggtags-with-temp-message "`gtags' in progress..."
           (let ((default-directory (file-name-as-directory root))
                 (args (append (cl-remove-if
