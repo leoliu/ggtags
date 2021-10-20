@@ -2371,10 +2371,22 @@ Function `ggtags-eldoc-function' disabled for eldoc in current buffer: %S" err))
 
 (cl-defstruct (ggtags-xref-location
                (:constructor ggtags-make-xref-location (file line column project-root)))
-  file project-root)
+  file line column project-root)
 
 (cl-defmethod xref-location-group ((l ggtags-xref-location))
   (file-relative-name (ggtags-xref-location-file l) (ggtags-xref-location-project-root l)))
+
+(cl-defmethod xref-location-marker ((l ggtags-xref-location))
+  (let ((buffer (find-file-noselect (ggtags-xref-location-file l))))
+    (with-current-buffer buffer
+      (save-excursion
+        (goto-char (point-min))
+        (forward-line (1- (ggtags-xref-location-line l)))
+        (move-to-column (1- (ggtags-xref-location-column l)))
+        (point-marker)))))
+
+(cl-defmethod xref-location-line ((l ggtags-xref-location))
+  (ggtags-xref-location-line l))
 
 (defun ggtags--xref-backend ()
   (and (ggtags-find-project)
