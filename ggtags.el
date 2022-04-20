@@ -2417,7 +2417,7 @@ properties in the summary text of each xref."
    with re = (cadr (assq 'grep ggtags-global-error-regexp-alist-alist))
    while (re-search-forward re nil t)
    for summary = (buffer-substring (1+ (match-end 2)) (line-end-position))
-   for file = (expand-file-name (file-truename (match-string 1)))
+   for file = (file-truename (match-string 1))
    for line = (string-to-number (match-string 2))
    for column = (string-match-p tag summary)
    if colored do (setq summary (ansi-color-apply summary)) end
