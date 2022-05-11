@@ -2417,7 +2417,7 @@ properties in the summary text of each xref."
    with re = (cadr (assq 'grep ggtags-global-error-regexp-alist-alist))
    while (re-search-forward re nil t)
    for summary = (buffer-substring (1+ (match-end 2)) (line-end-position))
-   for file = (expand-file-name (match-string 1) root)
+   for file = (expand-file-name (match-string 1))
    for line = (string-to-number (match-string 2))
    for column = (string-match-p tag summary)
    if colored do (setq summary (ansi-color-apply summary)) end
@@ -2450,12 +2450,13 @@ Return the list of xrefs for TAG."
                               (ggtags-project-has-color project))))
             (kill-buffer (current-buffer)))))
     (ggtags-with-current-project
-      (ggtags-global-output
-       (get-buffer-create " *ggtags-xref*")
-       (append
-        (split-string (ggtags-global-build-command cmd))
-        (list "--" (shell-quote-argument tag)))
-       collect ggtags--xref-limit 'sync)
+      (let ((default-directory (ggtags-current-project-root)))
+        (ggtags-global-output
+         (get-buffer-create " *ggtags-xref*")
+         (append
+          (split-string (ggtags-global-build-command cmd))
+          (list "--" (shell-quote-argument tag)))
+         collect ggtags--xref-limit 'sync))
       xrefs)))
 
 (cl-defmethod xref-backend-definitions ((_backend (eql ggtags)) tag)
