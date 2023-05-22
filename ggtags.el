@@ -1976,10 +1976,9 @@ ggtags: history match invalid, jump to first match instead")
     (and buffer-file-name ggtags-update-on-save
          (ggtags-update-tags-single buffer-file-name 'nowait))))
 
-(defun ggtags-global-output (buffer cmds callback &optional cutoff sync)
+(defun ggtags-global-output (buffer cmds callback &optional cutoff)
   "Asynchronously pipe the output of running CMDS to BUFFER.
-When finished invoke CALLBACK in BUFFER with process exit status.
-If SYNC is non-nil, synchronously run CMDS and call CALLBACK."
+When finished invoke CALLBACK in BUFFER with process exit status."
   (or buffer (error "Output buffer required"))
   (when (get-buffer-process (get-buffer buffer))
     ;; Notice running multiple processes in the same buffer so that we
@@ -2016,10 +2015,24 @@ If SYNC is non-nil, synchronously run CMDS and call CALLBACK."
     (and cutoff (set-process-filter proc filter))
     (set-process-sentinel proc sentinel)
     (process-put proc :callback-done nil)
-    (process-put proc :nlines 0)
-    (if sync (while (not (process-get proc :callback-done))
-               (accept-process-output proc 1))
-      proc)))
+    (process-put proc :nlines 0)))
+
+(defun ggtags-global-output-sync (buffer cmds callback)
+  "Synchronously run CMDS and show output in BUFFER.
+When finished invoke CALLBACK in BUFFER with process exit status."
+  ;; Same as `ggtags-global-output'
+  (or buffer (error "Output buffer required"))
+  (when (get-buffer-process (get-buffer buffer))
+    ;; Notice running multiple processes in the same buffer so that we
+    ;; can fix the caller. See for example `ggtags-eldoc-function'.
+    (message "Warning: detected %S already running in %S; interrupting..."
+             (get-buffer-process buffer) buffer)
+    (interrupt-process (get-buffer-process buffer)))
+  (let* ((program (car cmds))
+         (args (cdr cmds))
+         (status (apply #'call-process program nil buffer nil args)))
+    (with-current-buffer buffer
+      (funcall callback status))))
 
 (cl-defun ggtags-fontify-code (code &optional (mode major-mode))
   (cl-check-type mode function)
@@ -2451,12 +2464,12 @@ Return the list of xrefs for TAG."
             (kill-buffer (current-buffer)))))
     (ggtags-with-current-project
       (let ((default-directory (ggtags-current-project-root)))
-        (ggtags-global-output
+        (ggtags-global-output-sync
          (get-buffer-create " *ggtags-xref*")
          (append
           (split-string (ggtags-global-build-command cmd))
           (list "--" (shell-quote-argument tag)))
-         collect ggtags--xref-limit 'sync))
+         collect))
       xrefs)))
 
 (cl-defmethod xref-backend-definitions ((_backend (eql ggtags)) tag)
