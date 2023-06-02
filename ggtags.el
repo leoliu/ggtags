@@ -1992,7 +1992,6 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                                            (with-current-buffer buffer
                                              (line-number-at-pos (point-max)))
                                          0))))
-         (proc (apply #'start-file-process program buffer program args))
          (filter (lambda (proc string)
                    (and (buffer-live-p (process-buffer proc))
                         (with-current-buffer (process-buffer proc)
@@ -2008,14 +2007,13 @@ When finished invoke CALLBACK in BUFFER with process exit status."
                      (when (memq (process-status proc) '(exit signal))
                        (with-current-buffer (process-buffer proc)
                          (set-process-buffer proc nil)
-                         (unwind-protect
-                             (funcall callback (process-exit-status proc))
-                           (process-put proc :callback-done t)))))))
+                         (funcall callback (process-exit-status proc))))))
+         (proc (apply #'start-file-process program buffer program args)))
+    (set-process-sentinel proc sentinel)
     (set-process-query-on-exit-flag proc nil)
     (and cutoff (set-process-filter proc filter))
-    (set-process-sentinel proc sentinel)
-    (process-put proc :callback-done nil)
-    (process-put proc :nlines 0)))
+    (process-put proc :nlines 0)
+    proc))
 
 (defun ggtags-global-output-sync (buffer cmds callback)
   "Synchronously run CMDS and show output in BUFFER.
