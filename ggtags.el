@@ -2222,11 +2222,7 @@ to nil disables displaying this information.")
         (add-hook 'completion-at-point-functions
                   #'ggtags-completion-at-point t t)
         ;; Work around http://debbugs.gnu.org/19324
-        (or eldoc-documentation-function
-            (setq-local eldoc-documentation-function #'ignore))
-        (add-function :after-until (local 'eldoc-documentation-function)
-                      #'ggtags-eldoc-function '((name . ggtags-eldoc-function)
-                                                (depth . -100)))
+        (add-hook 'eldoc-documentation-functions #'ggtags-eldoc-function t)
         (unless (memq 'ggtags-mode-line-project-name
                       mode-line-buffer-identification)
           (setq mode-line-buffer-identification
@@ -2235,7 +2231,7 @@ to nil disables displaying this information.")
     (remove-hook 'after-save-hook 'ggtags-after-save-function t)
     (remove-hook 'xref-backend-functions 'ggtags--xref-backend t)
     (remove-hook 'completion-at-point-functions #'ggtags-completion-at-point t)
-    (remove-function (local 'eldoc-documentation-function) 'ggtags-eldoc-function)
+    (remove-hook 'ggtags-eldoc-function 'eldoc-documentation-functions t)
     (setq mode-line-buffer-identification
           (delq 'ggtags-mode-line-project-name mode-line-buffer-identification))
     (ggtags-cancel-highlight-tag-at-point 'keep-timer)))
@@ -2308,25 +2304,24 @@ to nil disables displaying this information.")
 (defvar-local ggtags-eldoc-cache nil)
 
 (declare-function eldoc-message "eldoc")
-(defun ggtags-eldoc-function ()
-  "A function suitable for `eldoc-documentation-function' (which see)."
+(defun ggtags-eldoc-function (callback &rest _ignored)
+  "A function suitable for `eldoc-documentation-functions' (which see)."
   (pcase (ggtags-tag-at-point)
     (`nil nil)
     (tag (if (equal tag (car ggtags-eldoc-cache))
-             (cadr ggtags-eldoc-cache)
+             (funcall callback (cadr ggtags-eldoc-cache))
            (and ggtags-project-root (ggtags-find-project)
                 (let* ((ggtags-print-definition-function
                         (lambda (s)
                           (setq ggtags-eldoc-cache (list tag s))
-                          (eldoc-message s))))
+                          (funcall callback s))))
                   ;; Prevent multiple runs of ggtags-show-definition
                   ;; for the same tag.
                   (setq ggtags-eldoc-cache (list tag))
                   (condition-case err
                       (ggtags-show-definition tag)
                     (file-error
-                     (remove-function (local 'eldoc-documentation-function)
-                                      'ggtags-eldoc-function)
+                     (remove-hook 'ggtags-eldoc-function 'eldoc-documentation-functions t)
                      (message "\
 Function `ggtags-eldoc-function' disabled for eldoc in current buffer: %S" err)))
                   nil))))))
